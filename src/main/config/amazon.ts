@@ -10,10 +10,8 @@ export const AMAZON_MARKETPLACE = {
 
 export const DEFAULT_AMAZON_MARKETPLACE: AmazonMarketplace = AMAZON_MARKETPLACE.JP
 
-export const AMAZON_USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-
 export const AMAZON_CRAWL_DELAY_MS = 1500
+export const AMAZON_DELIVERY_DETAIL_DELAY_MS = 1200
 export const AMAZON_MAX_DFS_DEPTH = 10
 export const AMAZON_ASIN_LENGTH = 10
 export const AMAZON_SESSION_COOKIE_NAME = 'session-id'
@@ -34,6 +32,20 @@ export const AMAZON_BEST_SELLERS_CONTENT_MARKERS = [
   'bestsellers',
   'Best Sellers'
 ] as const
+export const AMAZON_RISK_CONTROL_HTTP_STATUS = new Set([403, 429, 503])
+export const AMAZON_RISK_CONTROL_HTML_MARKERS = [
+  // 'api-services-support@amazon.com',
+  'to discuss automated access to amazon data please contact',
+  'enter the characters you see below',
+  'type the characters you see in this image',
+  '画像に表示されている文字を入力してください',
+  'id="captchacharacters"'
+] as const
+export const AMAZON_RISK_CONTROL_RETRY_POLICY = {
+  MAX_ATTEMPTS: 3,
+  BASE_DELAY_MS: 3000,
+  MAX_DELAY_MS: 15_000
+} as const
 export const AMAZON_ADDRESS_CHANGE_PAYLOAD = {
   LOCATION_TYPE: 'LOCATION_INPUT',
   DEVICE_TYPE: 'web',
@@ -116,7 +128,6 @@ export function resolveAmazonMarketplace(marketplace?: string): AmazonMarketplac
 
 export function createAmazonHtmlHeaders(cookies?: string): Record<string, string> {
   return {
-    [HTTP_HEADER.USER_AGENT]: AMAZON_USER_AGENT,
     [HTTP_HEADER.ACCEPT]: AMAZON_HTTP_HEADER_VALUE.ACCEPT_HTML,
     [HTTP_HEADER.ACCEPT_LANGUAGE]: AMAZON_HTTP_HEADER_VALUE.ACCEPT_LANGUAGE,
     ...(cookies ? { [HTTP_HEADER.COOKIE]: cookies } : {})

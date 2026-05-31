@@ -5,9 +5,11 @@ import {
   AMAZON_FALLBACK_COOKIE_VALUE,
   AMAZON_HTTP_HEADER_VALUE,
   AMAZON_PATH,
+  AMAZON_RISK_CONTROL_HTML_MARKERS,
+  AMAZON_RISK_CONTROL_HTTP_STATUS,
+  AMAZON_RISK_CONTROL_RETRY_POLICY,
   AMAZON_SESSION_COOKIE_NAME,
   AMAZON_UBID_COOKIE_PREFIX,
-  AMAZON_USER_AGENT,
   DEFAULT_AMAZON_MARKETPLACE,
   createAmazonBestSellersUrl,
   createAmazonHtmlHeaders,
@@ -23,8 +25,10 @@ import {
   serializeCookies
 } from '../../utils/cookie'
 import { getErrorMessage, isAbortError } from '../../utils/error'
-import { fetchResponse, fetchText } from '../../utils/http'
+import { fetchResponse, fetchText, HttpStatusError, rotateUserAgent } from '../../utils/http'
+import { sleep } from '../../utils/time'
 import { parseBestsellerCategories } from './amazon-parser'
+import { AmazonRiskControlError } from './errors'
 
 const SOURCE_CSRF_TOKEN_RE = /&quot;anti-csrftoken-a2z&quot;:&quot;(.*?)&quot;/
 const ADDRESS_SELECTION_CSRF_TOKEN_RE = /CSRF_TOKEN\s*:\s*"([^"]+)"/
@@ -39,10 +43,24 @@ function getOptionalString(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+function isRiskControlHttpError(error: unknown): error is HttpStatusError {
+  return error instanceof HttpStatusError && AMAZON_RISK_CONTROL_HTTP_STATUS.has(error.status)
+}
+
+function assertNoRiskControlHtml(html: string): void {
+  const normalizedHtml = html.toLowerCase()
+  const matchedMarker = AMAZON_RISK_CONTROL_HTML_MARKERS.find((marker) =>
+    normalizedHtml.includes(marker)
+  )
+
+  if (matchedMarker) {
+    throw new AmazonRiskControlError(`亚马逊返回风控验证页面，命中特征: ${matchedMarker}`)
+  }
+}
+
 function createCookieProbeHeaders(): Record<string, string> {
   return {
     [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.HTML_UTF8,
-    [HTTP_HEADER.USER_AGENT]: AMAZON_USER_AGENT,
     [HTTP_HEADER.ACCEPT]: AMAZON_HTTP_HEADER_VALUE.ACCEPT_HTML_COOKIE_PROBE,
     [HTTP_HEADER.ACCEPT_LANGUAGE]: AMAZON_HTTP_HEADER_VALUE.ACCEPT_LANGUAGE
   }
@@ -56,7 +74,6 @@ function createAddressSelectionHeaders(
   return {
     [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.HTML_UTF8,
     [HTTP_HEADER.REFERER]: referer,
-    [HTTP_HEADER.USER_AGENT]: AMAZON_USER_AGENT,
     [HTTP_HEADER.COOKIE]: cookies,
     [AMAZON_CSRF_HEADER]: csrfToken
   }
@@ -65,7 +82,6 @@ function createAddressSelectionHeaders(
 function createAddressChangeHeaders(cookies: string, csrfToken: string): Record<string, string> {
   return {
     [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.JSON,
-    [HTTP_HEADER.USER_AGENT]: AMAZON_USER_AGENT,
     [HTTP_HEADER.COOKIE]: cookies,
     [AMAZON_CSRF_HEADER]: csrfToken
   }
@@ -157,6 +173,10 @@ export class AmazonClient {
       }
     } catch (error) {
       if (isAbortError(error)) throw error
+      if (error instanceof AmazonRiskControlError) throw error
+      if (isRiskControlHttpError(error)) {
+        // throw new AmazonRiskControlError(`亚马逊 Cookie 握手被限制: ${getErrorMessage(error)}`)
+      }
 
       const message = getErrorMessage(error)
       onLog(`[警告] 动态地址 Cookie 交换异常: ${message}。启用降级方案。`)
@@ -175,10 +195,42 @@ export class AmazonClient {
   }
 
   public async fetchHtml(url: string, cookies: string, signal?: AbortSignal): Promise<string> {
-    return await fetchText(
-      url,
-      { headers: createAmazonHtmlHeaders(cookies), signal },
-      { errorPrefix: '页面抓取异常' }
+    let lastError: Error | undefined
+
+    for (let attempt = 1; attempt <= AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS; attempt++) {
+      try {
+        const html = await fetchText(
+          url,
+          { headers: createAmazonHtmlHeaders(cookies), signal },
+          { errorPrefix: '页面抓取异常' }
+        )
+        assertNoRiskControlHtml(html)
+        return html
+      } catch (error) {
+        // 用户主动中止，立即抛出
+        if (isAbortError(error as Error)) throw error
+
+        const isRiskControl =
+          error instanceof AmazonRiskControlError || isRiskControlHttpError(error)
+
+        if (!isRiskControl) throw error
+
+        lastError = error as Error
+
+        // 还有重试机会：切换 UA 后等待退避
+        if (attempt < AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS) {
+          rotateUserAgent()
+          const delay = Math.min(
+            AMAZON_RISK_CONTROL_RETRY_POLICY.BASE_DELAY_MS * 2 ** (attempt - 1),
+            AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_DELAY_MS
+          )
+          await sleep(delay, signal)
+        }
+      }
+    }
+
+    throw new AmazonRiskControlError(
+      `亚马逊页面请求被风控，已重试 ${AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS} 次仍失败: ${getErrorMessage(lastError)}`
     )
   }
 
@@ -227,6 +279,9 @@ export class AmazonClient {
       return html.match(ADDRESS_SELECTION_CSRF_TOKEN_RE)?.[1] || ''
     } catch (error) {
       if (isAbortError(error)) throw error
+      if (isRiskControlHttpError(error)) {
+        throw new AmazonRiskControlError(`亚马逊地址验证请求被限制: ${getErrorMessage(error)}`)
+      }
       return ''
     }
   }

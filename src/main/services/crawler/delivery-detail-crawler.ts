@@ -1,4 +1,8 @@
-import { createAmazonProductDetailUrl, resolveAmazonMarketplace } from '../../config/amazon'
+import {
+  AMAZON_DELIVERY_DETAIL_DELAY_MS,
+  createAmazonProductDetailUrl,
+  resolveAmazonMarketplace
+} from '../../config/amazon'
 import {
   DELIVERY_DETAIL_BATCH_SIZE,
   DELIVERY_DETAIL_CONCURRENCY,
@@ -21,6 +25,7 @@ import { sleep } from '../../utils/time'
 import { databaseService } from '../database.service'
 import { amazonClient } from './amazon-client'
 import { parseAmazonDeliveryDetailHtml } from './delivery-parser'
+import { AmazonRiskControlError } from './errors'
 
 interface DeliveryDetailCrawlerOptions {
   taskId: number
@@ -75,6 +80,12 @@ export class AmazonDeliveryDetailCrawler {
 
   public stop(): void {
     this.state.phase = DELIVERY_DETAIL_PHASE.STOPPING
+    this.notifyStateChange()
+  }
+
+  public fail(error: unknown): void {
+    this.state.phase = DELIVERY_DETAIL_PHASE.FAILED
+    this.state.lastError = getErrorMessage(error)
     this.notifyStateChange()
   }
 
@@ -142,9 +153,17 @@ export class AmazonDeliveryDetailCrawler {
       `[详情] 启动第 ${this.state.batchNumber} 批配送天数采集，共 ${batch.length} 个商品。`
     )
 
-    const results = await this.mapWithConcurrency(batch, (product) =>
-      this.fetchProductDetail(product, marketplace, cookies, signal)
-    )
+    const results = await this.mapWithConcurrency(batch, async (product) => {
+      const result = await this.fetchProductDetail(
+        product,
+        marketplace,
+        cookies,
+        onProgress,
+        signal
+      )
+      await sleep(AMAZON_DELIVERY_DETAIL_DELAY_MS, signal)
+      return result
+    })
     throwIfAborted(signal)
 
     const updates = results.flatMap((result) => (result.update ? [result.update] : []))
@@ -166,6 +185,7 @@ export class AmazonDeliveryDetailCrawler {
     product: PendingDeliveryDetailProduct,
     marketplace: AmazonMarketplace,
     cookies: string,
+    onProgress: CrawlerProgressHandler,
     signal?: AbortSignal
   ): Promise<DeliveryDetailResult> {
     this.updateQueueItem(product.id, { status: DELIVERY_DETAIL_ITEM_STATUS.FETCHING })
@@ -193,10 +213,17 @@ export class AmazonDeliveryDetailCrawler {
     } catch (error) {
       if (isAbortError(error)) throw error
 
+      const message = getErrorMessage(error)
       this.updateQueueItem(product.id, {
         status: DELIVERY_DETAIL_ITEM_STATUS.FAILED,
-        error: getErrorMessage(error)
+        error: message
       })
+      if (error instanceof AmazonRiskControlError) {
+        onProgress(`[风控] 商品 ${product.asin} 详情请求被亚马逊限制，停止详情并发采集: ${message}`)
+        throw error
+      }
+
+      onProgress(`[详情] 商品 ${product.asin} 详情请求失败，稍后可重试: ${message}`)
       return { failedProductId: product.id }
     }
   }

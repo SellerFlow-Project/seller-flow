@@ -53,6 +53,7 @@ export interface DeliveryDetailState {
   totalSucceeded: number
   totalFailed: number
   waitingProductCount: number
+  lastError?: string
   queue: DeliveryDetailQueueItem[]
 }
 

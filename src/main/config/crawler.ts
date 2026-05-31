@@ -16,6 +16,7 @@ export const CRAWLER_CATEGORY_PATH_SEPARATOR = ' > '
 export const CRAWLER_DEPTH_INDENT = '  '
 export const CRAWLER_HTML_SNIPPET_LENGTH = 500
 export const CRAWLER_HTML_SNIPPET_SUFFIX = '\n... [HTML 数据流已截止] ...'
+export const CRAWLER_MAX_CONSECUTIVE_EMPTY_PRODUCT_PAGES = 10
 export const DELIVERY_DETAIL_BATCH_SIZE = 100
 export const DELIVERY_DETAIL_CONCURRENCY = 5
 export const DELIVERY_DETAIL_POLL_INTERVAL_MS = 1000
@@ -25,6 +26,7 @@ export const DELIVERY_DETAIL_PHASE = {
   WAITING: 'waiting',
   RUNNING: 'running',
   STOPPING: 'stopping',
+  FAILED: 'failed',
   COMPLETED: 'completed'
 } as const
 

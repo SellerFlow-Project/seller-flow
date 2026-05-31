@@ -36,13 +36,14 @@ interface DeliveryDetailQueueItem {
 }
 
 interface DeliveryDetailState {
-  phase: 'idle' | 'waiting' | 'running' | 'stopping' | 'completed'
+  phase: 'idle' | 'waiting' | 'running' | 'stopping' | 'failed' | 'completed'
   batchSize: number
   concurrency: number
   batchNumber: number
   totalSucceeded: number
   totalFailed: number
   waitingProductCount: number
+  lastError?: string
   queue: DeliveryDetailQueueItem[]
 }
 
@@ -426,9 +427,11 @@ export const AmazonCollection: React.FC = () => {
         ? `等待满批 (${deliveryDetail.waitingProductCount}/${deliveryDetail.batchSize})`
         : deliveryDetail.phase === 'stopping'
           ? '正在停止'
-          : deliveryDetail.phase === 'completed'
-            ? '完整批次已处理完毕'
-            : '等待任务启动'
+          : deliveryDetail.phase === 'failed'
+            ? `详情采集失败: ${deliveryDetail.lastError || '未知异常'}`
+            : deliveryDetail.phase === 'completed'
+              ? '完整批次已处理完毕'
+              : '等待任务启动'
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50 dark:bg-black">

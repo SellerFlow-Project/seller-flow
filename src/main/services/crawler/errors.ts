@@ -1,5 +1,12 @@
 import { CRAWLER_ERROR_CODE } from '../../config/crawler'
 
+export class AmazonRiskControlError extends Error {
+  public constructor(message: string) {
+    super(message)
+    this.name = 'AmazonRiskControlError'
+  }
+}
+
 export class SellerSpriteAuthenticationError extends Error {
   public readonly code = CRAWLER_ERROR_CODE.SELLERSPRITE_AUTHENTICATION_FAILED
 

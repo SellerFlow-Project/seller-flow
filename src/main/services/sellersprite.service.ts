@@ -12,7 +12,6 @@ import {
   SELLERSPRITE_QUICK_VIEW_STATUS,
   SELLERSPRITE_RESPONSE_CODE,
   SELLERSPRITE_SOURCE,
-  SELLERSPRITE_USER_AGENT,
   SELLERSPRITE_VERSION
 } from '../config/sellersprite'
 import { HTTP_HEADER, HTTP_METHOD, MIME_TYPE } from '../config/http'
@@ -133,7 +132,6 @@ export class SellerSpriteService {
         signal,
         headers: {
           [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.JSON,
-          [HTTP_HEADER.USER_AGENT]: SELLERSPRITE_USER_AGENT,
           [HTTP_HEADER.ACCEPT]: MIME_TYPE.JSON
         }
       })
@@ -268,7 +266,6 @@ export class SellerSpriteService {
       })
 
       const headers: Record<string, string> = {
-        [HTTP_HEADER.USER_AGENT]: SELLERSPRITE_USER_AGENT,
         [HTTP_HEADER.ACCEPT]: MIME_TYPE.JSON,
         [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.JSON,
         [HTTP_HEADER.ACCEPT_LANGUAGE]: SELLERSPRITE_HTTP_HEADER_VALUE.ACCEPT_LANGUAGE

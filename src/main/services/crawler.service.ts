@@ -236,7 +236,11 @@ class CrawlerService {
         })
         .catch((error) => {
           deliveryDetailError = error
-          if (!isAbortError(error)) this.abortController?.abort()
+          if (!isAbortError(error)) {
+            this.deliveryDetailCrawler.fail(error)
+            onProgress(`[错误] 商品详情并发采集已熔断: ${getErrorMessage(error)}`)
+            this.abortController?.abort()
+          }
         })
 
       for (const category of firstLevelCategories) {
