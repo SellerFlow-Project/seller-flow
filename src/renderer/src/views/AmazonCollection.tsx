@@ -496,7 +496,7 @@ export const AmazonCollection: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50 dark:bg-black">
-      
+
       {/* 1. Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
         <div className="bg-card text-card-foreground border border-border rounded-lg p-5 flex items-center justify-between transition-all duration-200 hover:border-primary/50 hover:shadow-sm">
@@ -713,7 +713,7 @@ export const AmazonCollection: React.FC = () => {
 
       {/* 3. Middle Row: Concurrency Grid & Live Logs Console (Side-by-Side) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-0 shrink-0">
-        
+
         {/* Left Side: 详情并发采集进度 (lg:col-span-5) */}
         <div className="lg:col-span-5 bg-card text-card-foreground border border-border rounded-lg p-6 flex flex-col transition-all duration-200 hover:border-primary/20 hover:shadow-sm overflow-visible justify-between h-[470px]">
           <div>
@@ -723,12 +723,12 @@ export const AmazonCollection: React.FC = () => {
                 <h2 className="font-semibold text-base">详情并发采集进度</h2>
               </div>
               <div className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                Batch: 100
+                批次: 100
               </div>
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
-              系统从排行榜中拉取商品列表后，将以 <b>100 个 SKU / 批次</b> 启动高并发详情抓取。成功获取详细数据的商品方块将点亮为主题色。
+              系统从已采集排行中拉取商品列表，将以 <b>100 个商品 / 批次</b> 启动高并发详情抓取。成功获取详细数据的商品方块将点亮并将数据存入数据库中。
             </p>
 
             {/* Grid Container with custom inline columns to override standard tailwind limits */}
@@ -911,12 +911,12 @@ export const AmazonCollection: React.FC = () => {
               <GitBranch className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-semibold text-sm">实时采集拓扑图 (Crawl Topology)</h3>
+              <h3 className="font-semibold text-sm">实时采集拓扑图</h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
                 {isStopping
                   ? `正在停止任务 | 等待当前请求退出 | 当前路径深度: ${activePath.length} 层`
                   : isCrawling
-                  ? `DFS 深度递归挖掘中 | 当前路径深度: ${activePath.length} 层`
+                  ? `深度递归挖掘中 | 当前路径深度: ${activePath.length} 层`
                   : '后台处于就绪状态，等待任务开启'}
               </p>
             </div>
@@ -991,8 +991,7 @@ export const AmazonCollection: React.FC = () => {
                   等待采集任务启动以绘制实时拓扑图
                 </h4>
                 <p className="text-[11px] text-muted-foreground max-w-sm mt-1">
-                  启动亚马逊排行榜采集后，系统将在此处自动加载首级所有分类列表，并随 DFS
-                  深度遍历算法实时向下渲染当前正在解析的子分类链路。
+                  启动亚马逊排行榜采集后，系统将在此处自动加载首级所有分类列表，并随深度遍历算法实时向下渲染当前正在解析的子分类链路。
                 </p>
               </div>
             ) : (
@@ -1065,7 +1064,7 @@ export const AmazonCollection: React.FC = () => {
                         正在抓取一级分类根节点...
                       </h5>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
-                        正在发起网络握手，载入首级排行榜 HTML 并向下发掘子分类
+                        正在发起网络请求，载入首级排行榜并向下发掘子分类
                       </p>
                     </div>
                   ) : (
@@ -1128,14 +1127,14 @@ export const AmazonCollection: React.FC = () => {
       {showAdjustModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-hidden">
           {/* Backdrop Blur Overlay */}
-          <div 
+          <div
             className="absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
             onClick={cancelCrawlPreparation}
           />
-          
+
           {/* Modal Container */}
           <div className="relative w-full max-w-4xl bg-white/90 dark:bg-zinc-950/90 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden flex flex-col h-[85vh] max-h-[700px] animate-in zoom-in-95 duration-200">
-            
+
             {/* Modal Header */}
             <div className="p-6 border-b border-border/60 shrink-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
               <div className="flex items-center justify-between">
@@ -1150,7 +1149,7 @@ export const AmazonCollection: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={cancelCrawlPreparation}
                   className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                 >
@@ -1159,7 +1158,7 @@ export const AmazonCollection: React.FC = () => {
                   </svg>
                 </button>
               </div>
-              
+
               {/* Quick Actions Toolbar */}
               <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/40">
                 <div className="flex items-center gap-2">
@@ -1183,7 +1182,7 @@ export const AmazonCollection: React.FC = () => {
                     <span>恢复默认</span>
                   </button>
                 </div>
-                
+
                 {/* Stats */}
                 <div className="text-xs text-muted-foreground">
                   已启用分类: <span className="font-bold text-primary">{tempCategories.filter(c => c.enabled).length}</span> / {tempCategories.length}
@@ -1197,7 +1196,7 @@ export const AmazonCollection: React.FC = () => {
                 {tempCategories.map((cat, idx) => {
                   const isDragSource = draggedIndex === idx
                   const idxStr = String(idx + 1).padStart(2, '0')
-                  
+
                   return (
                     <div
                       key={cat.name}
@@ -1207,8 +1206,8 @@ export const AmazonCollection: React.FC = () => {
                       onDragEnd={handleDragEnd}
                       className={`
                         group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-grab select-none
-                        ${cat.enabled 
-                          ? 'bg-card text-card-foreground border-border/80 hover:border-primary/40 hover:shadow-sm' 
+                        ${cat.enabled
+                          ? 'bg-card text-card-foreground border-border/80 hover:border-primary/40 hover:shadow-sm'
                           : 'bg-slate-100/50 dark:bg-zinc-900/20 border-border/40 text-muted-foreground opacity-60'
                         }
                         ${isDragSource ? 'border-dashed border-primary bg-primary/5 opacity-50 scale-[0.98]' : ''}
@@ -1221,18 +1220,18 @@ export const AmazonCollection: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
                           </svg>
                         </div>
-                        
+
                         {/* Index Badge */}
                         <span className={`
                           font-mono text-xs font-bold px-1.5 py-0.5 rounded-md shrink-0
-                          ${cat.enabled 
-                            ? 'bg-primary/10 text-primary' 
+                          ${cat.enabled
+                            ? 'bg-primary/10 text-primary'
                             : 'bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-600'
                           }
                         `}>
                           {idxStr}
                         </span>
-                        
+
                         {/* Category Name */}
                         <span className="font-semibold text-xs truncate text-slate-800 dark:text-zinc-200" title={cat.name}>
                           {cat.name}
@@ -1240,7 +1239,7 @@ export const AmazonCollection: React.FC = () => {
                       </div>
 
                       {/* Enable Switch Toggle */}
-                      <div 
+                      <div
                         onClick={() => toggleCategory(idx)}
                         className="cursor-pointer p-1 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors shrink-0"
                       >
@@ -1270,7 +1269,7 @@ export const AmazonCollection: React.FC = () => {
               <span className="text-[11px] text-muted-foreground italic">
                 提示: 可以按住分类卡片左侧手柄拖动调整抓取顺序
               </span>
-              
+
               <div className="flex items-center gap-3">
                 <button
                   onClick={cancelCrawlPreparation}

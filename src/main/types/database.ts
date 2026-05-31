@@ -68,6 +68,7 @@ export interface CrawlTaskRow {
   status: CrawlTaskStatus
   created_at: string
   completed_at?: string | null
+  skuCount?: number
 }
 
 export interface CrawledProductRow {
@@ -107,6 +108,8 @@ export interface DatabaseStatistics {
   totalTasks: number
   totalSKUs: number
   avgPrice: number
+  dbSizeBytes?: number
+  dbSizeMB?: string
 }
 
 export interface SellerSpriteAccountRow {

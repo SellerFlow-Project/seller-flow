@@ -25,7 +25,7 @@ export const DashboardView: React.FC = () => {
         <div>
           <h2 className="text-xl font-extrabold text-foreground flex items-center space-x-2">
             <Activity className="w-5 h-5 text-primary animate-pulse" />
-            <span>智能跨境电商工作流看板 (Workbench)</span>
+            <span>智能跨境电商工作流看板</span>
           </h2>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-2xl">
             欢迎使用 SellerFlow！以下是为您定制的自动化商品流闭环。点击下方流程图中的各个核心处理节点，即可快速跳转到对应的业务界面展开工作。
@@ -35,13 +35,13 @@ export const DashboardView: React.FC = () => {
 
       {/* Main Flowchart Card */}
       <div className="bg-card text-card-foreground border border-border rounded-lg p-10 flex-1 flex flex-col items-center justify-center transition-all-200 hover:border-primary/20 min-h-[450px] relative overflow-hidden">
-        
+
         {/* Decorative Grid Background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(128,128,128,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(128,128,128,0.03)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
         {/* Outer Layout container */}
         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-11 gap-4 items-center relative z-10">
-          
+
           {/* Node 1: Left Node - Data Collection (数据采集) */}
           <div className="md:col-span-4 flex justify-center">
             <button
@@ -58,7 +58,7 @@ export const DashboardView: React.FC = () => {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground leading-normal mb-4">
-                配置关键字或ASIN，自动下载并解析亚马逊多站点Listing详细规格、实时价格及评分数据。
+                采集排行榜商品数据、关键词筛选等等。
               </p>
               <div className="flex items-center justify-between pt-3 border-t border-border text-[11px] font-bold text-primary">
                 <span>进入亚马逊采集</span>
@@ -108,7 +108,7 @@ export const DashboardView: React.FC = () => {
             <div className="md:hidden flex flex-col items-center justify-center space-y-4">
               <ArrowRight className="w-5 h-5 text-primary rotate-90" />
             </div>
-            
+
             <div className="absolute hidden md:flex items-center justify-center p-2 rounded-full border border-border bg-card text-muted-foreground">
               <Network className="w-4 h-4 text-primary animate-pulse" />
             </div>
@@ -116,7 +116,7 @@ export const DashboardView: React.FC = () => {
 
           {/* Right Nodes: Vertical Stack of Targets */}
           <div className="md:col-span-4 flex flex-col space-y-6 justify-center">
-            
+
             {/* Node 2: Top Right - Data Management (数据管理) */}
             <button
               onClick={() => setTab('data-browsing')}
@@ -132,7 +132,7 @@ export const DashboardView: React.FC = () => {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground leading-normal mb-4">
-                商品库多维搜索与批量筛选。提供一键导出为 CSV 备份，或执行 SQLite 数据瘦身与历史清理。
+                商品库多维搜索与批量筛选。提供一键导出为 CSV 备份，或执行数据瘦身与历史清理。
               </p>
               <div className="flex items-center justify-between pt-3 border-t border-border text-[11px] font-bold text-blue-500">
                 <span>进入数据浏览</span>

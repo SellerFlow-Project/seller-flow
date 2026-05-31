@@ -105,10 +105,10 @@ export const SettingsView: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50 dark:bg-black">
-      
+
       {/* Settings Canvas Layout wrapper */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
-        
+
         {/* Left Side: Settings Nav Tabs Sidebar (lg:col-span-3) */}
         <div className="lg:col-span-3 bg-card text-card-foreground border border-border rounded-lg p-4 flex flex-col justify-between shrink-0 shadow-sm">
           <div className="space-y-1">
@@ -127,7 +127,7 @@ export const SettingsView: React.FC = () => {
               }`}
             >
               <Sun className="w-4 h-4" />
-              <span>应用程序设置 (App)</span>
+              <span>应用程序设置</span>
             </button>
 
             <button
@@ -139,7 +139,7 @@ export const SettingsView: React.FC = () => {
               }`}
             >
               <Bell className="w-4 h-4" />
-              <span>通知服务配置 (Notify)</span>
+              <span>通知服务配置</span>
             </button>
 
             <button
@@ -151,7 +151,7 @@ export const SettingsView: React.FC = () => {
               }`}
             >
               <Sliders className="w-4 h-4" />
-              <span>采集运行配置 (Crawl)</span>
+              <span>采集运行配置</span>
             </button>
 
             <button
@@ -163,7 +163,7 @@ export const SettingsView: React.FC = () => {
               }`}
             >
               <Brain className="w-4 h-4" />
-              <span>AI大模型配置 (Model)</span>
+              <span>AI大模型配置</span>
             </button>
 
             <button
@@ -175,7 +175,7 @@ export const SettingsView: React.FC = () => {
               }`}
             >
               <Info className="w-4 h-4" />
-              <span>关于 SellerFlow (About)</span>
+              <span>关于 SellerFlow</span>
             </button>
           </div>
 
@@ -188,7 +188,7 @@ export const SettingsView: React.FC = () => {
 
         {/* Right Side: Active Settings Panel Content (lg:col-span-9) */}
         <div className="lg:col-span-9 bg-card text-card-foreground border border-border rounded-lg p-6 flex flex-col justify-between shadow-sm min-h-[460px]">
-          
+
           <div className="flex-1">
             {/* --- 1. APPLICATION SETTINGS --- */}
             {activeSection === 'app' && (
@@ -515,7 +515,7 @@ export const SettingsView: React.FC = () => {
                 <div className="space-y-4 pt-2">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
                     <ImageIcon className="w-3.5 h-3.5 text-primary" />
-                    <span>Diffusion 生图大模型 (Image Generator)</span>
+                    <span>生图大模型 (Image Generator)</span>
                   </h4>
                   <div className="bg-slate-50/50 dark:bg-zinc-900/10 border border-border/80 rounded-xl p-5 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -590,13 +590,13 @@ export const SettingsView: React.FC = () => {
                     </div>
 
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      SellerFlow 是专门为跨境电商卖家定制的高速、多线程、多层级排行榜深度数据采集沙盒。底层搭载基于深度优先递归树爬网 (DFS) 的多站点自适应抓取引擎，支持并轨实时卖家精灵指标数据回填，为您打通亚马逊排行榜选品最后一公里。
+                      SellerFlow 是专门为跨境电商卖家定制的高速、多线程、多层级排行榜深度数据采集沙盒。底层搭载基于深度优先递归树爬网的多站点自适应抓取引擎，支持并轨实时卖家精灵指标数据回填，为您打通亚马逊排行榜选品最后一公里。
                     </p>
 
                     {/* Module Badges */}
                     <div className="flex flex-wrap gap-2 pt-1.5">
                       <span className="text-[10px] bg-slate-200/50 dark:bg-zinc-900 border border-border/80 px-2 py-0.5 rounded-full text-slate-600 dark:text-zinc-400 font-medium">
-                        📥 DFS 分类拓扑树挖掘
+                        📥 分类拓扑树挖掘
                       </span>
                       <span className="text-[10px] bg-slate-200/50 dark:bg-zinc-900 border border-border/80 px-2 py-0.5 rounded-full text-slate-600 dark:text-zinc-400 font-medium">
                         🟩 Batch-100 并发进度网格
@@ -627,7 +627,7 @@ export const SettingsView: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <button
               onClick={handleSave}
               className="inline-flex items-center justify-center space-x-2 bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-md hover:bg-primary/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0 text-xs"

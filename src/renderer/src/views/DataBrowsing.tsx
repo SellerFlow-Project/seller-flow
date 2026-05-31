@@ -61,23 +61,23 @@ export const DataBrowsing: React.FC = () => {
   const [selectedLevels, setSelectedLevels] = useState<string[]>([]) // 级联选中的分类段，例如 ['洋書', '文学']
   const [sellerTypes, setSellerTypes] = useState<string[]>([])
   const [selectedSellerType, setSelectedSellerType] = useState<string>('')
-  
+
   // 过滤与排序
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<string>('rank') // 默认按照排名排序
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('ASC')
-  
+
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize] = useState(20) // 💡 用户要求一页显示20条
   const [totalCount, setTotalCount] = useState(0)
   const [products, setProducts] = useState<CrawledProduct[]>([])
-  
+
   // 全局交互状态
   const [isLoadingTasks, setIsLoadingTasks] = useState(false)
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [copiedAsin, setCopiedAsin] = useState<string | null>(null)
-  
+
   // 详情模态框状态
   const [activeProductDetail, setActiveProductDetail] = useState<CrawledProduct | null>(null)
   const [bsrRanks, setBsrRanks] = useState<any[]>([])
@@ -204,7 +204,7 @@ export const DataBrowsing: React.FC = () => {
   // 3. 构建多级分类层级字典树
   const categoryTree = useMemo(() => {
     const root: CategoryNode = { name: 'root', fullPath: '', children: new Map() }
-    
+
     // 解析扁平分类路径列表，构建层级树
     const allPaths: string[] = []
     categories.forEach((cat) => {
@@ -223,7 +223,7 @@ export const DataBrowsing: React.FC = () => {
       const segments = path.split(' > ').map((s) => s.trim())
       let current = root
       const pathParts: string[] = []
-      
+
       segments.forEach((segment) => {
         pathParts.push(segment)
         const fullPath = pathParts.join(' > ')
@@ -309,7 +309,7 @@ export const DataBrowsing: React.FC = () => {
   // 💡 价格格式化辅助函数
   const formatPrice = (amount: number, currency: string) => {
     if (!amount || amount === 0) return '免费/未标价'
-    
+
     // JPY 统一显示整数日元 (¥)，USD 显示两位小数美元 ($)
     const upperCurrency = currency.toUpperCase()
     if (upperCurrency === 'JPY') {
@@ -321,7 +321,7 @@ export const DataBrowsing: React.FC = () => {
     } else if (upperCurrency === 'EUR') {
       return `€${amount.toFixed(2)}`
     }
-    
+
     return `${currency} ${amount.toLocaleString()}`
   }
 
@@ -331,7 +331,7 @@ export const DataBrowsing: React.FC = () => {
     try {
       const d = new Date(isoStr)
       if (isNaN(d.getTime())) return isoStr
-      
+
       const pad = (n: number) => n.toString().padStart(2, '0')
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
     } catch {
@@ -349,7 +349,7 @@ export const DataBrowsing: React.FC = () => {
 
       const pad = (n: number) => n.toString().padStart(2, '0')
       const formattedDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-      
+
       const now = Date.now()
       const diffMs = now - timestamp
       const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
@@ -383,11 +383,11 @@ export const DataBrowsing: React.FC = () => {
   // 根据 selectedLevels，动态返回每一级的可用子分类选项
   const selectLevelsOptions = useMemo(() => {
     const list: string[][] = []
-    
+
     // 1. 第一级永远可用
     const level1Options = Array.from(categoryTree.children.keys())
     list.push(level1Options)
-    
+
     // 2. 依次推导后续子级选项
     let currentNode = categoryTree
     for (let i = 0; i < selectedLevels.length; i++) {
@@ -400,7 +400,7 @@ export const DataBrowsing: React.FC = () => {
         break
       }
     }
-    
+
     return list
   }, [categoryTree, selectedLevels])
 
@@ -419,7 +419,7 @@ export const DataBrowsing: React.FC = () => {
             <h2 className="text-xl font-bold text-foreground">数据浏览 (Data Browsing)</h2>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            浏览与检索 SQLite 数据库中保存的亚马逊畅销排行榜商品采集明细
+            浏览与检索数据库中保存的亚马逊商品采集明细
           </p>
         </div>
 
@@ -492,7 +492,7 @@ export const DataBrowsing: React.FC = () => {
           <div className="max-w-md space-y-2">
             <h3 className="text-lg font-bold text-foreground">暂无采集任务</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              本地 SQLite 数据库中目前没有任何抓取任务记录。请前往左侧菜单的“亚马逊采集”页面，新建并开启一个畅销排行榜爬虫，成功采集后即可在此无缝浏览多级类目下的精选商品！
+              本地数据库中目前没有任何抓取任务记录。请前往左侧菜单的“亚马逊采集”页面，新建并开启一个爬虫任务，成功采集后即可在此浏览多级类目下的商品！
             </p>
           </div>
         </div>
@@ -516,9 +516,9 @@ export const DataBrowsing: React.FC = () => {
             {/* A. 级联分类选择器 */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground block">
-                级联分类层级 (支持子类钻取过滤)
+                级联分类层级
               </label>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 {selectLevelsOptions.map((options, idx) => {
                   const selectedVal = selectedLevels[idx] || ''
@@ -539,14 +539,14 @@ export const DataBrowsing: React.FC = () => {
                     </div>
                   )
                 })}
-                
+
                 {/* 已经过滤到最深层且没有更多子分类的提示 */}
                 {categories.length > 0 && selectLevelsOptions.length <= selectedLevels.length && (
                   <div className="flex items-center text-xs text-muted-foreground px-2 py-2 italic">
                     已达到分类最底层
                   </div>
                 )}
-                
+
                 {/* 分类解析加载提示 */}
                 {categories.length === 0 && (
                   <div className="col-span-full py-1 text-xs text-amber-500 font-semibold flex items-center space-x-1">
@@ -583,7 +583,7 @@ export const DataBrowsing: React.FC = () => {
 
               {/* 配送方式筛选 */}
               <div className="md:col-span-2 space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground block">配送方式 (Seller Type)</label>
+                <label className="text-xs font-bold text-muted-foreground block">配送方式</label>
                 <select
                   value={selectedSellerType}
                   onChange={(e) => {
@@ -619,10 +619,10 @@ export const DataBrowsing: React.FC = () => {
                   }}
                   className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200"
                 >
-                  <option value="rank">排行榜名次 (Rank)</option>
-                  <option value="price_amount">销售价格 (Price)</option>
-                  <option value="crawled_at">采集入库时间 (Crawl Time)</option>
-                  <option value="id">物理自增 ID (Sequence ID)</option>
+                  <option value="rank">排行榜名次</option>
+                  <option value="price_amount">销售价格</option>
+                  <option value="crawled_at">采集入库时间</option>
+                  <option value="id">物理自增 ID</option>
                 </select>
               </div>
 
@@ -648,12 +648,12 @@ export const DataBrowsing: React.FC = () => {
 
           {/* 4. 商品核心数据网格/表格 Card */}
           <div className="bg-card text-card-foreground border border-border rounded-lg p-6 shadow-sm flex flex-col justify-between transition-all duration-200 hover:border-primary/20 min-h-[400px] relative">
-            
+
             {/* 顶栏信息 */}
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
               <div className="flex items-center space-x-2">
                 <span className="inline-flex h-2 w-2 rounded-full bg-primary" />
-                <h3 className="font-bold text-base">商品网格视图 (一页 20 条)</h3>
+                <h3 className="font-bold text-base">商品网格视图</h3>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -668,7 +668,7 @@ export const DataBrowsing: React.FC = () => {
               {isLoadingProducts && (
                 <div className="absolute inset-0 bg-background/60 backdrop-blur-[1px] z-10 flex flex-col items-center justify-center space-y-3">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-xs text-primary font-bold">正在极速从 SQLite 读取数据明细...</p>
+                  <p className="text-xs text-primary font-bold">正在从读取数据明细...</p>
                 </div>
               )}
 
@@ -678,7 +678,7 @@ export const DataBrowsing: React.FC = () => {
                     <th className="py-3.5 px-4 font-bold text-center w-20">缩略图</th>
                     <th className="py-3.5 px-4 font-bold min-w-[280px]">商品标题</th>
                     <th className="py-3.5 px-4 font-bold text-center w-24">配送方式</th>
-                    <th className="py-3.5 px-4 font-bold text-right w-32">月销量 (估)</th>
+                    <th className="py-3.5 px-4 font-bold text-right w-32">月销量</th>
                     <th className="py-3.5 px-4 font-bold text-center w-28">上架时间</th>
                     <th className="py-3.5 px-4 font-bold text-right w-28">单价</th>
                     <th className="py-3.5 px-4 font-bold text-center w-20">操作</th>
@@ -816,7 +816,7 @@ export const DataBrowsing: React.FC = () => {
                 显示第 {products.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} 至{' '}
                 {Math.min(currentPage * pageSize, totalCount)} 条商品，共 {totalCount} 条
               </span>
-              
+
               <div className="inline-flex items-center space-x-2 shrink-0">
                 <button
                   onClick={() => setCurrentPage(1)}
@@ -832,11 +832,11 @@ export const DataBrowsing: React.FC = () => {
                 >
                   上一页
                 </button>
-                
+
                 <span className="text-2xs font-extrabold px-3 py-1 bg-primary/10 text-primary border border-primary/25 rounded">
                   第 {currentPage} 页 / 共 {totalPages} 页
                 </span>
-                
+
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
@@ -871,7 +871,7 @@ export const DataBrowsing: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2">
                 <Sparkles className="w-4 h-4 text-amber-500" />
-                <h4 className="font-extrabold text-sm text-foreground">商品抓取明细 HUD</h4>
+                <h4 className="font-extrabold text-sm text-foreground">商品明细</h4>
               </div>
               <button
                 onClick={() => setActiveProductDetail(null)}
@@ -920,14 +920,14 @@ export const DataBrowsing: React.FC = () => {
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">解耦数值单价</span>
+                    <span className="text-muted-foreground font-semibold block">价格</span>
                     <span className="font-bold text-foreground">
                       {formatPrice(activeProductDetail.price_amount, activeProductDetail.currency)}
                     </span>
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">配送方式 (Seller Type)</span>
+                    <span className="text-muted-foreground font-semibold block">配送方式</span>
                     {activeProductDetail.seller_type ? (
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-extrabold uppercase border self-start ${
                         activeProductDetail.seller_type.toUpperCase() === 'FBA'
@@ -946,11 +946,11 @@ export const DataBrowsing: React.FC = () => {
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">卖家精灵月销量 (估)</span>
+                    <span className="text-muted-foreground font-semibold block">月销量</span>
                     {activeProductDetail.sellersprite_units !== undefined && activeProductDetail.sellersprite_units !== null ? (
                       <span className="font-bold text-foreground flex items-center space-x-1">
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>{activeProductDetail.sellersprite_units.toLocaleString()} 件 / 月</span>
+                        <span>{activeProductDetail.sellersprite_units.toLocaleString()} 件</span>
                       </span>
                     ) : (
                       <span className="font-bold text-foreground">-</span>
@@ -958,20 +958,20 @@ export const DataBrowsing: React.FC = () => {
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">数据入库时间</span>
+                    <span className="text-muted-foreground font-semibold block">数据采集时间</span>
                     <span className="font-mono text-muted-foreground">
                       {formatDate(activeProductDetail.crawled_at)}
                     </span>
                   </div>
 
                   <div className="space-y-0.5 col-span-2 border-t border-border/50 pt-2">
-                    <span className="text-muted-foreground font-semibold block">商品上架时间 (Available)</span>
+                    <span className="text-muted-foreground font-semibold block">商品上架时间</span>
                     {renderAvailableField(activeProductDetail.sellersprite_available)}
                   </div>
                 </div>
 
                 <div className="space-y-1.5 pt-2 text-2xs">
-                  <span className="text-muted-foreground font-semibold block">抓分类路径段 (完整)</span>
+                  <span className="text-muted-foreground font-semibold block">分类</span>
                   <div className="space-y-1.5">
                     {activeProductDetail.category_name.split(' | ').map((path, idx) => (
                       <div key={idx} className="bg-secondary text-secondary-foreground border border-border rounded px-2.5 py-1.5 leading-normal break-all font-medium flex items-center space-x-1.5">
@@ -987,7 +987,7 @@ export const DataBrowsing: React.FC = () => {
                   <div className="flex items-center space-x-1.5">
                     <Award className="w-4 h-4 text-amber-500" />
                     <span className="font-extrabold text-foreground uppercase tracking-wider">
-                      BSR 榜单热销排名 (Best Sellers Rank)
+                      榜单热销排名
                     </span>
                   </div>
 
@@ -1032,7 +1032,7 @@ export const DataBrowsing: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-center py-4 text-3xs text-muted-foreground italic border border-dashed border-border rounded bg-muted/20">
-                      该商品暂无关联的 BSR 排名记录
+                      该商品暂无关联的排名记录
                     </div>
                   )}
                 </div>
@@ -1058,7 +1058,7 @@ export const DataBrowsing: React.FC = () => {
                   </>
                 )}
               </button>
-              
+
               <a
                 href={activeProductDetail.product_url}
                 target="_blank"
@@ -1066,7 +1066,7 @@ export const DataBrowsing: React.FC = () => {
                 className="inline-flex items-center space-x-1.5 bg-primary text-primary-foreground hover:bg-primary/95 text-2xs font-semibold py-1.5 px-3.5 rounded-md shadow-sm transition-all"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                <span>在亚马逊查看 (新页)</span>
+                <span>在亚马逊查看</span>
               </a>
             </div>
           </div>

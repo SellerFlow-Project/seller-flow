@@ -16,9 +16,9 @@ export enum CrawlTaskType {
  * 采集任务类型名称对照表
  */
 export const CrawlTaskTypeNames: Record<CrawlTaskType, string> = {
-  [CrawlTaskType.BEST_SELLERS]: '排行榜采集 (Best Sellers)',
-  [CrawlTaskType.KEYWORD_SEARCH]: '关键词搜索采集 (Keywords)',
-  [CrawlTaskType.ASIN_LOOKUP]: 'ASIN 精确采集 (ASIN Details)',
+  [CrawlTaskType.BEST_SELLERS]: '排行榜采集',
+  [CrawlTaskType.KEYWORD_SEARCH]: '关键词搜索采集',
+  [CrawlTaskType.ASIN_LOOKUP]: 'ASIN 精确采集',
 }
 
 /**

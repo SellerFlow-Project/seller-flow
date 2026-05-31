@@ -1,4 +1,5 @@
 import { join } from 'path'
+import * as fs from 'fs'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
 import {
@@ -329,7 +330,11 @@ class DatabaseService {
    */
   public queryTasks(): CrawlTaskRow[] {
     const db = this.assertDb()
-    const stmt = db.prepare('SELECT * FROM crawl_tasks ORDER BY created_at DESC')
+    const stmt = db.prepare(`
+      SELECT t.*, (SELECT COUNT(*) FROM crawled_products WHERE task_id = t.id) as skuCount
+      FROM crawl_tasks t 
+      ORDER BY created_at DESC
+    `)
     return stmt.all() as CrawlTaskRow[]
   }
 
@@ -470,13 +475,27 @@ class DatabaseService {
       .prepare('SELECT AVG(price_amount) as avgPrice FROM crawled_products WHERE price_amount > 0')
       .get() as { avgPrice: number }
 
+    let dbSizeBytes = 0
+    let dbSizeMB = '0.0 MB'
+    try {
+      if (fs.existsSync(this.dbPath)) {
+        const stat = fs.statSync(this.dbPath)
+        dbSizeBytes = stat.size
+        dbSizeMB = (dbSizeBytes / (1024 * 1024)).toFixed(1) + ' MB'
+      }
+    } catch (e) {
+      console.warn('[DatabaseService] Failed to get db size:', e)
+    }
+
     return {
       totalTasks: totalTasksResult ? totalTasksResult.cnt : 0,
       totalSKUs: totalProductsResult ? totalProductsResult.cnt : 0,
       avgPrice:
         avgPriceResult && avgPriceResult.avgPrice
           ? parseFloat(avgPriceResult.avgPrice.toFixed(DATABASE_STATISTICS_DECIMAL_PLACES))
-          : 0
+          : 0,
+      dbSizeBytes,
+      dbSizeMB
     }
   }
 
