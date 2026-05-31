@@ -24,6 +24,48 @@ import {
   MarketplaceConfigs
 } from '../types/crawler'
 
+const DELIVERY_DETAIL_BATCH_SIZE = 100
+
+interface DeliveryDetailQueueItem {
+  productId: number
+  asin: string
+  status: 'pending' | 'fetching' | 'success' | 'failed'
+  title?: string
+  deliveryDays?: string | null
+  error?: string
+}
+
+interface DeliveryDetailState {
+  phase: 'idle' | 'waiting' | 'running' | 'stopping' | 'completed'
+  batchSize: number
+  concurrency: number
+  batchNumber: number
+  totalSucceeded: number
+  totalFailed: number
+  waitingProductCount: number
+  queue: DeliveryDetailQueueItem[]
+}
+
+const EMPTY_DELIVERY_DETAIL_STATE: DeliveryDetailState = {
+  phase: 'idle',
+  batchSize: DELIVERY_DETAIL_BATCH_SIZE,
+  concurrency: 5,
+  batchNumber: 0,
+  totalSucceeded: 0,
+  totalFailed: 0,
+  waitingProductCount: 0,
+  queue: []
+}
+
+const EMPTY_DELIVERY_DETAIL_QUEUE: DeliveryDetailQueueItem[] = Array.from(
+  { length: DELIVERY_DETAIL_BATCH_SIZE },
+  (_, index) => ({
+    productId: -(index + 1),
+    asin: '-',
+    status: 'pending'
+  })
+)
+
 export const AmazonCollection: React.FC = () => {
   // Use state variables typed from the crawler module to verify Keep-Alive state persistence
   const [taskType, setTaskType] = useState<CrawlTaskType>(CrawlTaskType.BEST_SELLERS)
@@ -31,9 +73,7 @@ export const AmazonCollection: React.FC = () => {
   const [crawlStrategy, setCrawlStrategy] = useState<'strategy1' | 'strategy2'>('strategy1')
   const [isCrawling, setIsCrawling] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
-  const [logs, setLogs] = useState<string[]>([
-    '系统就绪，等待用户启动采集任务。'
-  ])
+  const [logs, setLogs] = useState<string[]>(['系统就绪，等待用户启动采集任务。'])
   const [metrics, setMetrics] = useState({
     totalCollected: 0,
     successRate: 100,
@@ -50,40 +90,17 @@ export const AmazonCollection: React.FC = () => {
   // 💡 Category Customization States
   const [isFetchingCats, setIsFetchingCats] = useState(false)
   const [showAdjustModal, setShowAdjustModal] = useState(false)
-  const [tempCategories, setTempCategories] = useState<{ name: string; href: string; enabled: boolean }[]>([])
-  const [originalCategories, setOriginalCategories] = useState<{ name: string; href: string; enabled: boolean }[]>([])
+  const [tempCategories, setTempCategories] = useState<
+    { name: string; href: string; enabled: boolean }[]
+  >([])
+  const [originalCategories, setOriginalCategories] = useState<
+    { name: string; href: string; enabled: boolean }[]
+  >([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
 
-  // 🟢 Concurrency Grid state (representing 100 products detail fetching)
-  interface CrawlQueueItem {
-    id: number
-    status: 'pending' | 'fetching' | 'success' | 'failed'
-    sku: string
-    title?: string
-    error?: string
-  }
-
-  const [crawlQueue, setCrawlQueue] = useState<CrawlQueueItem[]>(() => {
-    // Generate 100 mock SKU items
-    return Array.from({ length: 100 }, (_, i) => {
-      const id = i + 1
-      const padId = String(id).padStart(3, '0')
-      let status: 'pending' | 'fetching' | 'success' | 'failed' = 'pending'
-      if (id <= 42) status = 'success'
-      else if (id >= 43 && id <= 45) status = 'fetching'
-      else if (id === 46 || id === 47) status = 'failed'
-
-      return {
-        id,
-        status,
-        sku: `B08X${padId}AMZ`,
-        title: `Amazon Hot Product SKU-${padId}`,
-        error: id === 46 ? 'Http 503 Rate Limit' : id === 47 ? 'Proxy Timeout' : undefined
-      }
-    })
-  })
-
-  const [isSimulating, setIsSimulating] = useState(false)
+  const [deliveryDetail, setDeliveryDetail] = useState<DeliveryDetailState>(
+    EMPTY_DELIVERY_DETAIL_STATE
+  )
 
   const logsContainerRef = useRef<HTMLDivElement>(null)
 
@@ -109,66 +126,6 @@ export const AmazonCollection: React.FC = () => {
       clearTimeout(timer)
     }
   }, [logs])
-
-  // Simulate the concurrent crawling process
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null
-    if (isSimulating) {
-      timer = setInterval(() => {
-        setCrawlQueue((prevQueue) => {
-          const fetchingItems = prevQueue.filter((item) => item.status === 'fetching')
-          let updated = false
-
-          const nextQueue = prevQueue.map((item) => {
-            // Resolve some fetching items with slight delay
-            if (item.status === 'fetching' && Math.random() > 0.45) {
-              updated = true
-              const isSuccess = Math.random() > 0.1 // 90% success rate
-              return {
-                ...item,
-                status: (isSuccess ? 'success' : 'failed') as 'success' | 'failed',
-                error: isSuccess
-                  ? undefined
-                  : Math.random() > 0.5
-                  ? 'Anti-bot Blocked (403)'
-                  : 'Connection Timeout (504)'
-              }
-            }
-            // Trigger some pending items to fetching state
-            if (
-              item.status === 'pending' &&
-              fetchingItems.length < 6 &&
-              Math.random() > 0.75 &&
-              !updated
-            ) {
-              updated = true
-              return {
-                ...item,
-                status: 'fetching' as const
-              }
-            }
-            return item
-          })
-
-          // Check if all items are finished
-          const allFinished = nextQueue.every(
-            (item) => item.status === 'success' || item.status === 'failed'
-          )
-          if (allFinished) {
-            setIsSimulating(false)
-            if (timer) clearInterval(timer)
-            setLogs((prev) => [...prev, '[系统] [模拟进度] 100个商品详情并发请求采集已全部完成！'])
-          }
-
-          return nextQueue
-        })
-      }, 300)
-    }
-
-    return () => {
-      if (timer) clearInterval(timer)
-    }
-  }, [isSimulating])
 
   // IPC Event Gateway: 绑定主进程流式回传的实时爬虫进度日志和 DFS 状态拓扑
   useEffect(() => {
@@ -200,6 +157,7 @@ export const AmazonCollection: React.FC = () => {
       if (state.activePath) setActivePath(state.activePath)
       if (typeof state.isCrawling === 'boolean') setIsCrawling(state.isCrawling)
       if (typeof state.runState === 'string') setIsStopping(state.runState === 'stopping')
+      if (state.deliveryDetail) setDeliveryDetail(state.deliveryDetail)
     }
 
     // 监听主进程的流式通信消息与拓扑状态广播
@@ -231,6 +189,7 @@ export const AmazonCollection: React.FC = () => {
           if (status.firstLevelCats) setFirstLevelCats(status.firstLevelCats)
           if (status.completedPrimaries) setCompletedPrimaries(status.completedPrimaries)
           if (status.activePath) setActivePath(status.activePath)
+          if (status.deliveryDetail) setDeliveryDetail(status.deliveryDetail)
         }
       } catch (err) {
         console.error('[AmazonCollection] 检测后台爬虫状态失败:', err)
@@ -250,7 +209,10 @@ export const AmazonCollection: React.FC = () => {
    */
   const startCrawl = async () => {
     setIsFetchingCats(true)
-    setLogs((prev) => [...prev, `[系统] 正在准备开启 ${MarketplaceConfigs[marketplace].name} 采集任务...`])
+    setLogs((prev) => [
+      ...prev,
+      `[系统] 正在准备开启 ${MarketplaceConfigs[marketplace].name} 采集任务...`
+    ])
     setLogs((prev) => [...prev, '[系统] 正在动态获取 Cookie 凭证并尝试抓取排行榜顶级分类数据...'])
 
     try {
@@ -275,7 +237,10 @@ export const AmazonCollection: React.FC = () => {
       setOriginalCategories(JSON.parse(JSON.stringify(formattedCats)))
       setTempCategories(formattedCats)
       setShowAdjustModal(true)
-      setLogs((prev) => [...prev, `[成功] 成功抓取到 ${res.categories.length} 个顶层分类目录，已打开自定义调整弹窗。`])
+      setLogs((prev) => [
+        ...prev,
+        `[成功] 成功抓取到 ${res.categories.length} 个顶层分类目录，已打开自定义调整弹窗。`
+      ])
     } catch (err: any) {
       const errMsg = err.message || '未知错误'
       setLogs((prev) => [...prev, `[错误] 准备采集任务失败: ${errMsg}`])
@@ -297,6 +262,7 @@ export const AmazonCollection: React.FC = () => {
       if (status.firstLevelCats) setFirstLevelCats(status.firstLevelCats)
       if (status.completedPrimaries) setCompletedPrimaries(status.completedPrimaries)
       if (status.activePath) setActivePath(status.activePath)
+      if (status.deliveryDetail) setDeliveryDetail(status.deliveryDetail)
     } catch (err) {
       console.error('[AmazonCollection] 同步后台爬虫状态失败:', err)
     }
@@ -321,6 +287,7 @@ export const AmazonCollection: React.FC = () => {
     setFirstLevelCats([])
     setCompletedPrimaries([])
     setActivePath([])
+    setDeliveryDetail(EMPTY_DELIVERY_DETAIL_STATE)
 
     setMetrics({
       totalCollected: 0,
@@ -425,8 +392,8 @@ export const AmazonCollection: React.FC = () => {
           const message = res.accepted
             ? '[系统] 主进程已受理停止请求，正在等待当前网络请求退出并清理状态...'
             : res.runState === 'stopping'
-            ? '[系统] 任务已处于停止处理中，请稍候...'
-            : '[系统] 当前没有正在运行的采集任务。'
+              ? '[系统] 任务已处于停止处理中，请稍候...'
+              : '[系统] 当前没有正在运行的采集任务。'
           const next = [...prev, message]
           return next.length > 300 ? next.slice(next.length - 300) : next
         })
@@ -443,60 +410,28 @@ export const AmazonCollection: React.FC = () => {
     setLogs(['控制台已清空。'])
   }
 
-  const handleStartSimulation = () => {
-    setCrawlQueue(
-      Array.from({ length: 100 }, (_, i) => {
-        const id = i + 1
-        const padId = String(id).padStart(3, '0')
-        return {
-          id,
-          status: 'pending',
-          sku: `B08X${padId}AMZ`,
-          title: `Amazon Hot Product SKU-${padId}`
-        }
-      })
-    )
-    setIsSimulating(true)
-    setLogs((prev) => [
-      ...prev,
-      '[系统] [模拟进度] 启动并发请求模拟：正在对新抓取的 100 个 SKU 进行并发数据提取...'
-    ])
-  }
-
-  const handleResetQueue = () => {
-    setIsSimulating(false)
-    setCrawlQueue(
-      Array.from({ length: 100 }, (_, i) => {
-        const id = i + 1
-        const padId = String(id).padStart(3, '0')
-        let status: 'pending' | 'fetching' | 'success' | 'failed' = 'pending'
-        if (id <= 42) status = 'success'
-        else if (id >= 43 && id <= 45) status = 'fetching'
-        else if (id === 46 || id === 47) status = 'failed'
-
-        return {
-          id,
-          status,
-          sku: `B08X${padId}AMZ`,
-          title: `Amazon Hot Product SKU-${padId}`,
-          error: id === 46 ? 'Http 503 Rate Limit' : id === 47 ? 'Proxy Timeout' : undefined
-        }
-      })
-    )
-    setLogs((prev) => [...prev, '[系统] [模拟进度] 并发采集网格数据已重置为默认演示状态。'])
-  }
-
   // Calculated Queue Stats
+  const crawlQueue = deliveryDetail.queue
+  const visibleCrawlQueue = crawlQueue.length > 0 ? crawlQueue : EMPTY_DELIVERY_DETAIL_QUEUE
   const successCount = crawlQueue.filter((i) => i.status === 'success').length
   const failedCount = crawlQueue.filter((i) => i.status === 'failed').length
   const fetchingCount = crawlQueue.filter((i) => i.status === 'fetching').length
   const pendingCount = crawlQueue.filter((i) => i.status === 'pending').length
   const completedCount = successCount + failedCount
-  const completionPercentage = Math.round((completedCount / 100) * 100)
+  const completionPercentage = Math.round((completedCount / deliveryDetail.batchSize) * 100)
+  const deliveryPhaseText =
+    deliveryDetail.phase === 'running'
+      ? `第 ${deliveryDetail.batchNumber} 批执行中`
+      : deliveryDetail.phase === 'waiting'
+        ? `等待满批 (${deliveryDetail.waitingProductCount}/${deliveryDetail.batchSize})`
+        : deliveryDetail.phase === 'stopping'
+          ? '正在停止'
+          : deliveryDetail.phase === 'completed'
+            ? '完整批次已处理完毕'
+            : '等待任务启动'
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50 dark:bg-black">
-
       {/* 1. Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0">
         <div className="bg-card text-card-foreground border border-border rounded-lg p-5 flex items-center justify-between transition-all duration-200 hover:border-primary/50 hover:shadow-sm">
@@ -691,7 +626,9 @@ export const AmazonCollection: React.FC = () => {
             <div className="bg-slate-50 dark:bg-slate-900/50 border border-border/65 rounded-md p-3.5">
               <h4 className="text-xs font-bold uppercase text-primary mb-1 flex items-center space-x-1.5">
                 <Activity className="w-3.5 h-3.5 text-primary" />
-                <span>采集策略说明 - {crawlStrategy === 'strategy1' ? '实时并轨' : '延迟回填'}</span>
+                <span>
+                  采集策略说明 - {crawlStrategy === 'strategy1' ? '实时并轨' : '延迟回填'}
+                </span>
               </h4>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 {crawlStrategy === 'strategy1' ? (
@@ -713,22 +650,22 @@ export const AmazonCollection: React.FC = () => {
 
       {/* 3. Middle Row: Concurrency Grid & Live Logs Console (Side-by-Side) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch min-h-0 shrink-0">
-
         {/* Left Side: 详情并发采集进度 (lg:col-span-5) */}
         <div className="lg:col-span-5 bg-card text-card-foreground border border-border rounded-lg p-6 flex flex-col transition-all duration-200 hover:border-primary/20 hover:shadow-sm overflow-visible justify-between h-[470px]">
           <div>
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
               <div className="flex items-center space-x-2">
                 <Grid className="w-5 h-5 text-primary" />
-                <h2 className="font-semibold text-base">详情并发采集进度</h2>
+                <h2 className="font-semibold text-base">商品详情采集进度</h2>
               </div>
               <div className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">
-                批次: 100
+                批次: {deliveryDetail.batchSize} | 并发: {deliveryDetail.concurrency}
               </div>
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed mb-4">
-              系统从已采集排行中拉取商品列表，将以 <b>100 个商品 / 批次</b> 启动高并发详情抓取。成功获取详细数据的商品方块将点亮并将数据存入数据库中。
+              系统从已采集排行中拉取商品列表，将以 <b>100 个商品 / 批次</b>{' '}
+              启动高并发详情抓取，用于解析商品的“配送天数”。成功获取详细数据的商品方块将点亮并将数据存入数据库中。
             </p>
 
             {/* Grid Container with custom inline columns to override standard tailwind limits */}
@@ -737,46 +674,55 @@ export const AmazonCollection: React.FC = () => {
                 className="grid gap-1 justify-center max-w-[320px] mx-auto overflow-visible"
                 style={{ gridTemplateColumns: 'repeat(20, minmax(0, 1fr))' }}
               >
-                {crawlQueue.map((item) => {
-                  let statusBg = 'bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700'
+                {visibleCrawlQueue.map((item) => {
+                  let statusBg =
+                    'bg-slate-200 dark:bg-zinc-800 hover:bg-slate-300 dark:hover:bg-zinc-700'
                   if (item.status === 'success') {
-                    statusBg = 'bg-primary hover:bg-primary/90 hover:scale-110 shadow-sm shadow-primary/30'
+                    statusBg =
+                      'bg-primary hover:bg-primary/90 hover:scale-110 shadow-sm shadow-primary/30'
                   } else if (item.status === 'fetching') {
-                    statusBg = 'bg-blue-500 dark:bg-blue-400 animate-pulse ring-2 ring-blue-400 dark:ring-blue-500 ring-offset-1 dark:ring-offset-black'
+                    statusBg =
+                      'bg-blue-500 dark:bg-blue-400 animate-pulse ring-2 ring-blue-400 dark:ring-blue-500 ring-offset-1 dark:ring-offset-black'
                   } else if (item.status === 'failed') {
-                    statusBg = 'bg-rose-500 dark:bg-rose-600 hover:bg-rose-400 dark:hover:bg-rose-500 hover:scale-110 shadow-sm shadow-rose-500/30'
+                    statusBg =
+                      'bg-rose-500 dark:bg-rose-600 hover:bg-rose-400 dark:hover:bg-rose-500 hover:scale-110 shadow-sm shadow-rose-500/30'
                   }
 
                   return (
                     <div
-                      key={item.id}
+                      key={item.productId}
                       className={`w-2.5 h-2.5 rounded-sm transition-all duration-300 relative group cursor-pointer ${statusBg}`}
                     >
                       {/* Premium Custom Tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2.5 hidden group-hover:block z-[9999] w-40 bg-slate-950 border border-zinc-800 text-white text-[10px] p-2 rounded shadow-2xl pointer-events-none transition-all duration-200">
                         <div className="font-semibold text-slate-200 flex justify-between border-b border-zinc-800 pb-1 mb-1">
-                          <span>商品 #{item.id}</span>
+                          <span>商品 #{Math.abs(item.productId)}</span>
                           <span
                             className={
                               item.status === 'success'
                                 ? 'text-emerald-400 font-bold'
                                 : item.status === 'failed'
-                                ? 'text-rose-400 font-bold'
-                                : item.status === 'fetching'
-                                ? 'text-blue-400 font-bold animate-pulse'
-                                : 'text-slate-400'
+                                  ? 'text-rose-400 font-bold'
+                                  : item.status === 'fetching'
+                                    ? 'text-blue-400 font-bold animate-pulse'
+                                    : 'text-slate-400'
                             }
                           >
                             {item.status === 'success'
                               ? '采集成功'
                               : item.status === 'failed'
-                              ? '失败'
-                              : item.status === 'fetching'
-                              ? '并发中...'
-                              : '就绪等待'}
+                                ? '失败'
+                                : item.status === 'fetching'
+                                  ? '并发中...'
+                                  : '就绪等待'}
                           </span>
                         </div>
-                        <p className="font-mono text-zinc-400 select-all">SKU: {item.sku}</p>
+                        <p className="font-mono text-zinc-400 select-all">ASIN: {item.asin}</p>
+                        {item.status === 'success' && (
+                          <p className="text-emerald-400 mt-1 text-[9px] leading-tight border-t border-zinc-900 pt-1">
+                            配送天数: {item.deliveryDays || '-'}
+                          </p>
+                        )}
                         {item.error && (
                           <p className="text-rose-400 mt-1 select-none text-[9px] leading-tight border-t border-zinc-900 pt-1">
                             ⚠️ {item.error}
@@ -829,23 +775,11 @@ export const AmazonCollection: React.FC = () => {
                 />
               </div>
 
-              {/* Simulator Buttons */}
-              <div className="flex items-center gap-2 pt-1.5">
-                <button
-                  onClick={handleStartSimulation}
-                  disabled={isSimulating}
-                  className="flex-1 inline-flex items-center justify-center space-x-1 text-[10px] bg-primary/10 hover:bg-primary/20 text-primary font-bold py-1.5 rounded border border-primary/25 disabled:opacity-40 transition-colors"
-                >
-                  <Play className="w-3 h-3" />
-                  <span>模拟并发采集</span>
-                </button>
-                <button
-                  onClick={handleResetQueue}
-                  className="inline-flex items-center justify-center p-1.5 rounded bg-slate-100 hover:bg-slate-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-muted-foreground hover:text-foreground border border-border transition-colors"
-                  title="重置网格"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-1.5 text-[10px]">
+                <span className="font-bold text-primary">{deliveryPhaseText}</span>
+                <span className="text-muted-foreground">
+                  累计成功 {deliveryDetail.totalSucceeded} | 失败 {deliveryDetail.totalFailed}
+                </span>
               </div>
             </div>
           </div>
@@ -873,7 +807,12 @@ export const AmazonCollection: React.FC = () => {
           >
             {logs.map((log, index) => {
               let color = 'text-slate-300'
-              if (log.startsWith('[成功]') || log.includes('✅') || log.includes('🎉') || log.includes('[模拟进度]'))
+              if (
+                log.startsWith('[成功]') ||
+                log.includes('✅') ||
+                log.includes('🎉') ||
+                log.includes('[模拟进度]')
+              )
                 color = 'text-emerald-400 font-semibold'
               if (log.startsWith('[警告]')) color = 'text-amber-400 font-semibold'
               if (
@@ -896,7 +835,6 @@ export const AmazonCollection: React.FC = () => {
             })}
           </div>
         </div>
-
       </div>
 
       {/* 4. 实时采集拓扑图 (Full Width Panel at the bottom) */}
@@ -916,8 +854,8 @@ export const AmazonCollection: React.FC = () => {
                 {isStopping
                   ? `正在停止任务 | 等待当前请求退出 | 当前路径深度: ${activePath.length} 层`
                   : isCrawling
-                  ? `深度递归挖掘中 | 当前路径深度: ${activePath.length} 层`
-                  : '后台处于就绪状态，等待任务开启'}
+                    ? `深度递归挖掘中 | 当前路径深度: ${activePath.length} 层`
+                    : '后台处于就绪状态，等待任务开启'}
               </p>
             </div>
           </div>
@@ -1134,7 +1072,6 @@ export const AmazonCollection: React.FC = () => {
 
           {/* Modal Container */}
           <div className="relative w-full max-w-4xl bg-white/90 dark:bg-zinc-950/90 border border-slate-200/80 dark:border-zinc-800/80 rounded-2xl shadow-2xl shadow-primary/10 overflow-hidden flex flex-col h-[85vh] max-h-[700px] animate-in zoom-in-95 duration-200">
-
             {/* Modal Header */}
             <div className="p-6 border-b border-border/60 shrink-0 bg-gradient-to-r from-primary/5 via-transparent to-primary/5">
               <div className="flex items-center justify-between">
@@ -1154,7 +1091,12 @@ export const AmazonCollection: React.FC = () => {
                   className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
               </div>
@@ -1185,7 +1127,11 @@ export const AmazonCollection: React.FC = () => {
 
                 {/* Stats */}
                 <div className="text-xs text-muted-foreground">
-                  已启用分类: <span className="font-bold text-primary">{tempCategories.filter(c => c.enabled).length}</span> / {tempCategories.length}
+                  已启用分类:{' '}
+                  <span className="font-bold text-primary">
+                    {tempCategories.filter((c) => c.enabled).length}
+                  </span>{' '}
+                  / {tempCategories.length}
                 </div>
               </div>
             </div>
@@ -1206,9 +1152,10 @@ export const AmazonCollection: React.FC = () => {
                       onDragEnd={handleDragEnd}
                       className={`
                         group flex items-center justify-between p-3.5 rounded-xl border transition-all duration-200 cursor-grab select-none
-                        ${cat.enabled
-                          ? 'bg-card text-card-foreground border-border/80 hover:border-primary/40 hover:shadow-sm'
-                          : 'bg-slate-100/50 dark:bg-zinc-900/20 border-border/40 text-muted-foreground opacity-60'
+                        ${
+                          cat.enabled
+                            ? 'bg-card text-card-foreground border-border/80 hover:border-primary/40 hover:shadow-sm'
+                            : 'bg-slate-100/50 dark:bg-zinc-900/20 border-border/40 text-muted-foreground opacity-60'
                         }
                         ${isDragSource ? 'border-dashed border-primary bg-primary/5 opacity-50 scale-[0.98]' : ''}
                       `}
@@ -1216,24 +1163,40 @@ export const AmazonCollection: React.FC = () => {
                       <div className="flex items-center space-x-3.5 truncate">
                         {/* Drag Handle */}
                         <div className="text-muted-foreground/40 group-hover:text-muted-foreground/80 transition-colors shrink-0">
-                          <svg className="w-4 h-4 cursor-move" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h16" />
+                          <svg
+                            className="w-4 h-4 cursor-move"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2.5}
+                              d="M4 6h16M4 12h16M4 18h16"
+                            />
                           </svg>
                         </div>
 
                         {/* Index Badge */}
-                        <span className={`
+                        <span
+                          className={`
                           font-mono text-xs font-bold px-1.5 py-0.5 rounded-md shrink-0
-                          ${cat.enabled
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-600'
+                          ${
+                            cat.enabled
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-slate-200 dark:bg-zinc-800 text-slate-400 dark:text-zinc-600'
                           }
-                        `}>
+                        `}
+                        >
                           {idxStr}
                         </span>
 
                         {/* Category Name */}
-                        <span className="font-semibold text-xs truncate text-slate-800 dark:text-zinc-200" title={cat.name}>
+                        <span
+                          className="font-semibold text-xs truncate text-slate-800 dark:text-zinc-200"
+                          title={cat.name}
+                        >
                           {cat.name}
                         </span>
                       </div>
@@ -1279,7 +1242,7 @@ export const AmazonCollection: React.FC = () => {
                 </button>
                 <button
                   onClick={confirmAndStartCrawl}
-                  disabled={tempCategories.filter(c => c.enabled).length === 0}
+                  disabled={tempCategories.filter((c) => c.enabled).length === 0}
                   className="px-5 py-2 bg-primary hover:bg-primary/95 font-semibold text-xs rounded-lg text-primary-foreground hover:shadow-lg hover:shadow-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />

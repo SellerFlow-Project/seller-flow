@@ -1,9 +1,18 @@
-import type { CRAWLER_RUN_STATE, CRAWL_STRATEGY, CRAWL_TASK_TYPE } from '../config/crawler'
+import type {
+  CRAWLER_RUN_STATE,
+  CRAWL_STRATEGY,
+  CRAWL_TASK_TYPE,
+  DELIVERY_DETAIL_ITEM_STATUS,
+  DELIVERY_DETAIL_PHASE
+} from '../config/crawler'
 import type { AmazonMarketplace, AmazonCategory } from './amazon'
 
 export type CrawlStrategy = (typeof CRAWL_STRATEGY)[keyof typeof CRAWL_STRATEGY]
 export type CrawlTaskType = (typeof CRAWL_TASK_TYPE)[keyof typeof CRAWL_TASK_TYPE]
 export type CrawlerRunState = (typeof CRAWLER_RUN_STATE)[keyof typeof CRAWLER_RUN_STATE]
+export type DeliveryDetailPhase = (typeof DELIVERY_DETAIL_PHASE)[keyof typeof DELIVERY_DETAIL_PHASE]
+export type DeliveryDetailItemStatus =
+  (typeof DELIVERY_DETAIL_ITEM_STATUS)[keyof typeof DELIVERY_DETAIL_ITEM_STATUS]
 
 export interface CrawlTaskConfig {
   taskType: CrawlTaskType
@@ -24,6 +33,27 @@ export interface DfsState {
   activePath: DfsPathNode[]
   isCrawling: boolean
   runState: CrawlerRunState
+  deliveryDetail: DeliveryDetailState
+}
+
+export interface DeliveryDetailQueueItem {
+  productId: number
+  asin: string
+  title: string
+  status: DeliveryDetailItemStatus
+  deliveryDays?: string | null
+  error?: string
+}
+
+export interface DeliveryDetailState {
+  phase: DeliveryDetailPhase
+  batchSize: number
+  concurrency: number
+  batchNumber: number
+  totalSucceeded: number
+  totalFailed: number
+  waitingProductCount: number
+  queue: DeliveryDetailQueueItem[]
 }
 
 export interface CrawlerStatus {

@@ -31,6 +31,7 @@ import {
   parseBestsellerChildCategories as parseAmazonBestsellerChildCategories
 } from './crawler/amazon-parser'
 import { AmazonCategoryCrawler } from './crawler/category-crawler'
+import { AmazonDeliveryDetailCrawler } from './crawler/delivery-detail-crawler'
 import { databaseService } from './database.service'
 
 export { parseAmazonBestSellerHtml } from './crawler/amazon-parser'
@@ -48,6 +49,9 @@ class CrawlerService {
   private readonly categoryCrawler = new AmazonCategoryCrawler(
     () => this.isStopping,
     () => this.broadcastState()
+  )
+  private readonly deliveryDetailCrawler = new AmazonDeliveryDetailCrawler(() =>
+    this.broadcastState()
   )
 
   private get isRunning(): boolean {
@@ -104,7 +108,8 @@ class CrawlerService {
       completedPrimaries: Array.from(this.completedPrimaries),
       activePath: this.categoryCrawler.getActivePath(),
       isCrawling: this.isRunning,
-      runState: this.runState
+      runState: this.runState,
+      deliveryDetail: this.deliveryDetailCrawler.getState()
     }
   }
 
@@ -163,6 +168,7 @@ class CrawlerService {
     }
 
     this.runState = CRAWLER_RUN_STATE.STOPPING
+    this.deliveryDetailCrawler.stop()
     this.abortController?.abort()
     const databaseStatusUpdated = this.tryUpdateTaskStatus(
       taskId,
@@ -197,6 +203,9 @@ class CrawlerService {
     onProgress: CrawlerProgressHandler
   ): Promise<void> {
     const signal = this.abortController?.signal
+    let isCategoryCrawlComplete = false
+    let deliveryDetailError: unknown
+    let deliveryDetailOutcome: Promise<void> | null = null
 
     try {
       const cookieResult = await this.getAmazonCookies(marketplaceConfig.code, signal)
@@ -216,6 +225,19 @@ class CrawlerService {
       onProgress(
         `[成功] 成功检索到 ${firstLevelCategories.length} 个首级核心分类目录，开始启动 DFS 深度迭代爬网...`
       )
+      deliveryDetailOutcome = this.deliveryDetailCrawler
+        .run({
+          taskId,
+          marketplace: marketplaceConfig.code,
+          cookies: cookieResult.cookies,
+          signal,
+          isSourceComplete: () => isCategoryCrawlComplete,
+          onProgress
+        })
+        .catch((error) => {
+          deliveryDetailError = error
+          if (!isAbortError(error)) this.abortController?.abort()
+        })
 
       for (const category of firstLevelCategories) {
         if (this.isStopping) break
@@ -236,6 +258,10 @@ class CrawlerService {
         onProgress(`[回溯] 🟢 一级分类线 [${category.name}] 处理完毕，回滚回顶层目录。`)
       }
 
+      isCategoryCrawlComplete = true
+      await deliveryDetailOutcome
+      if (deliveryDetailError) throw deliveryDetailError
+
       if (this.isStopping) {
         onProgress('[终止] 后台爬取任务已被手动终止。')
         this.tryUpdateTaskStatus(taskId, CRAWL_TASK_STATUS.CANCELLED, onProgress)
@@ -244,11 +270,17 @@ class CrawlerService {
         this.tryUpdateTaskStatus(taskId, CRAWL_TASK_STATUS.COMPLETED, onProgress)
       }
     } catch (error) {
-      if (this.isStopping || isAbortError(error)) {
+      isCategoryCrawlComplete = true
+      this.abortController?.abort()
+      await deliveryDetailOutcome
+      const taskError =
+        deliveryDetailError && !isAbortError(deliveryDetailError) ? deliveryDetailError : error
+
+      if (this.isStopping || (isAbortError(taskError) && !deliveryDetailError)) {
         onProgress('[终止] 后台爬取任务已被手动终止。')
         this.tryUpdateTaskStatus(taskId, CRAWL_TASK_STATUS.CANCELLED, onProgress)
       } else {
-        onProgress(`[错误] 任务爬取异常终止: ${getErrorMessage(error)}`)
+        onProgress(`[错误] 任务爬取异常终止: ${getErrorMessage(taskError)}`)
         this.tryUpdateTaskStatus(taskId, CRAWL_TASK_STATUS.FAILED, onProgress)
       }
     } finally {
@@ -277,6 +309,7 @@ class CrawlerService {
     this.firstLevelCatsList = []
     this.completedPrimaries.clear()
     this.categoryCrawler.reset()
+    this.deliveryDetailCrawler.reset()
   }
 
   private resetTask(taskId: number): void {
@@ -286,6 +319,7 @@ class CrawlerService {
     this.activeTask = null
     this.runState = CRAWLER_RUN_STATE.IDLE
     this.abortController = null
+    this.deliveryDetailCrawler.markIdle()
     this.categoryCrawler.reset()
   }
 

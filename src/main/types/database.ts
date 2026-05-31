@@ -87,7 +87,21 @@ export interface CrawledProductRow {
   sellersprite_units?: number | null
   sellersprite_available?: number | null
   has_sellersprite_data: SqliteBoolean
+  delivery_days?: string | null
+  has_delivery_detail: SqliteBoolean
   crawled_at: string
+}
+
+export interface PendingDeliveryDetailProduct {
+  id: number
+  task_id: number
+  asin: string
+  title: string
+}
+
+export interface ProductDeliveryDetailUpdate {
+  productId: number
+  deliveryDays: string | null
 }
 
 export interface ProductBsrRankRow {

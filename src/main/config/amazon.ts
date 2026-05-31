@@ -24,7 +24,9 @@ export const AMAZON_PATH = {
   ADDRESS_SELECTIONS:
     '/portal-migration/hz/glow/get-rendered-address-selections?deviceType=desktop&pageType=Search&storeContext=NoStoreName&actionSource=desktop-modal',
   ADDRESS_CHANGE: '/portal-migration/hz/glow/address-change?actionSource=glow',
-  BEST_SELLERS: '/ranking?type=top-sellers&ref_=nav_cs_bestsellers'
+  BEST_SELLERS: '/ranking?type=top-sellers&ref_=nav_cs_bestsellers',
+  PRODUCT_DETAIL_PREFIX: '/dp/',
+  PRODUCT_DETAIL_SUFFIX: '?psc=1'
 } as const
 export const AMAZON_BEST_SELLERS_CONTENT_MARKERS = [
   '売れ筋',
@@ -98,6 +100,10 @@ export function createAmazonUrl(domain: string, path: string): string {
 
 export function createAmazonBestSellersUrl(baseUrl: string): string {
   return `${baseUrl}${AMAZON_PATH.BEST_SELLERS}`
+}
+
+export function createAmazonProductDetailUrl(baseUrl: string, asin: string): string {
+  return `${baseUrl}${AMAZON_PATH.PRODUCT_DETAIL_PREFIX}${asin}${AMAZON_PATH.PRODUCT_DETAIL_SUFFIX}`
 }
 
 export function resolveAmazonMarketplace(marketplace?: string): AmazonMarketplaceConfig {

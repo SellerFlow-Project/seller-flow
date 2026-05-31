@@ -21,7 +21,9 @@ import type {
   CrawlTaskStatus,
   DatabaseStatistics,
   IncomingCrawledProduct,
+  PendingDeliveryDetailProduct,
   ProductBsrRankRow,
+  ProductDeliveryDetailUpdate,
   ProductQueryFilter,
   SellerSpriteAccountRow,
   SellerSpriteAccountStatus,
@@ -124,6 +126,11 @@ class DatabaseService {
       {
         name: 'has_sellersprite_data',
         sql: `ALTER TABLE crawled_products ADD COLUMN has_sellersprite_data INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE}`
+      },
+      { name: 'delivery_days', sql: 'ALTER TABLE crawled_products ADD COLUMN delivery_days TEXT' },
+      {
+        name: 'has_delivery_detail',
+        sql: `ALTER TABLE crawled_products ADD COLUMN has_delivery_detail INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE}`
       }
     ]
 
@@ -135,6 +142,7 @@ class DatabaseService {
 
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_products_sellersprite_flag ON crawled_products(has_sellersprite_data);
+      CREATE INDEX IF NOT EXISTS idx_products_delivery_detail_flag ON crawled_products(task_id, has_delivery_detail);
 
       CREATE TABLE IF NOT EXISTS product_bsr_ranks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -323,6 +331,58 @@ class DatabaseService {
     })
 
     transaction(products)
+  }
+
+  public queryPendingDeliveryDetails(
+    taskId: number,
+    limit: number,
+    excludedProductIds: ReadonlySet<number> = new Set()
+  ): PendingDeliveryDetailProduct[] {
+    const db = this.assertDb()
+    const excludedIds = Array.from(excludedProductIds)
+    const exclusionSql =
+      excludedIds.length > 0 ? `AND id NOT IN (${excludedIds.map(() => '?').join(', ')})` : ''
+    const stmt = db.prepare(`
+      SELECT id, task_id, asin, title
+      FROM crawled_products
+      WHERE task_id = ?
+        AND has_delivery_detail = ?
+        ${exclusionSql}
+      ORDER BY id ASC
+      LIMIT ?
+    `)
+
+    return stmt.all(
+      taskId,
+      SQLITE_BOOLEAN.FALSE,
+      ...excludedIds,
+      limit
+    ) as PendingDeliveryDetailProduct[]
+  }
+
+  public updateProductDeliveryDetails(updates: ProductDeliveryDetailUpdate[]): number {
+    if (updates.length === 0) return 0
+
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      UPDATE crawled_products
+      SET delivery_days = ?, has_delivery_detail = ?
+      WHERE id = ? AND has_delivery_detail = ?
+    `)
+    const transaction = db.transaction((items: ProductDeliveryDetailUpdate[]) => {
+      let affectedRows = 0
+      for (const item of items) {
+        affectedRows += stmt.run(
+          item.deliveryDays,
+          SQLITE_BOOLEAN.TRUE,
+          item.productId,
+          SQLITE_BOOLEAN.FALSE
+        ).changes
+      }
+      return affectedRows
+    })
+
+    return transaction(updates)
   }
 
   /**

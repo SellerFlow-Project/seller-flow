@@ -42,6 +42,8 @@ interface CrawledProduct {
   seller_type?: string | null
   sellersprite_units?: number | null
   sellersprite_available?: number | null
+  delivery_days?: string | null
+  has_delivery_detail: 0 | 1
   crawled_at: string
 }
 
@@ -93,7 +95,10 @@ export const DataBrowsing: React.FC = () => {
     const fetchBsrRanks = async () => {
       setIsLoadingBsr(true)
       try {
-        const res = await window.electron.ipcRenderer.invoke('db:get-product-bsr-ranks', activeProductDetail.id)
+        const res = await window.electron.ipcRenderer.invoke(
+          'db:get-product-bsr-ranks',
+          activeProductDetail.id
+        )
         if (res.success && res.list) {
           setBsrRanks(res.list)
         } else {
@@ -196,7 +201,7 @@ export const DataBrowsing: React.FC = () => {
 
     setSelectedLevels([]) // 重置分类选择
     setSelectedSellerType('') // 重置配送方式选择
-    setCurrentPage(1)     // 重置分页
+    setCurrentPage(1) // 重置分页
     fetchCategories(selectedTaskId)
     fetchSellerTypes(selectedTaskId)
   }, [selectedTaskId])
@@ -281,7 +286,15 @@ export const DataBrowsing: React.FC = () => {
   // 依赖项更新时自动重算商品列表 (分页、任务、检索项、分类段、配送方式、排序)
   useEffect(() => {
     fetchProducts()
-  }, [selectedTaskId, searchQuery, selectedLevels, selectedSellerType, sortBy, sortOrder, currentPage])
+  }, [
+    selectedTaskId,
+    searchQuery,
+    selectedLevels,
+    selectedSellerType,
+    sortBy,
+    sortOrder,
+    currentPage
+  ])
 
   // 重置所有筛选条件
   const handleResetFilters = () => {
@@ -358,7 +371,8 @@ export const DataBrowsing: React.FC = () => {
       return (
         <span className="flex items-center gap-2 flex-wrap">
           <span className="font-bold text-foreground">
-            {formattedDate} <span className="text-muted-foreground font-semibold">({diffDays}天)</span>
+            {formattedDate}{' '}
+            <span className="text-muted-foreground font-semibold">({diffDays}天)</span>
           </span>
           {isNew && (
             <span className="inline-flex items-center px-2 py-0.5 rounded text-3xs font-extrabold uppercase bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50 shrink-0 animate-pulse">
@@ -465,7 +479,9 @@ export const DataBrowsing: React.FC = () => {
                   }
                   return (
                     <option key={task.id} value={task.id}>
-                      {task.task_name} (任务 ID: {task.id} | {task.marketplace === 'amazon.co.jp' ? '日本站' : task.marketplace} | {statusMap[task.status] || task.status})
+                      {task.task_name} (任务 ID: {task.id} |{' '}
+                      {task.marketplace === 'amazon.co.jp' ? '日本站' : task.marketplace} |{' '}
+                      {statusMap[task.status] || task.status})
                     </option>
                   )
                 })}
@@ -477,7 +493,9 @@ export const DataBrowsing: React.FC = () => {
           </div>
 
           <div className="text-right shrink-0">
-            <span className="text-xs font-semibold text-muted-foreground uppercase">当前任务关联数</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase">
+              当前任务关联数
+            </span>
             <p className="text-xl font-black text-primary mt-0.5">{totalCount} 条商品明细</p>
           </div>
         </div>
@@ -515,9 +533,7 @@ export const DataBrowsing: React.FC = () => {
 
             {/* A. 级联分类选择器 */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground block">
-                级联分类层级
-              </label>
+              <label className="text-xs font-bold text-muted-foreground block">级联分类层级</label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                 {selectLevelsOptions.map((options, idx) => {
@@ -529,7 +545,9 @@ export const DataBrowsing: React.FC = () => {
                         onChange={(e) => handleCategoryLevelChange(idx, e.target.value)}
                         className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200"
                       >
-                        <option value="">{idx === 0 ? '所有主分类' : `请选择第 ${idx + 1} 级子分类`}</option>
+                        <option value="">
+                          {idx === 0 ? '所有主分类' : `请选择第 ${idx + 1} 级子分类`}
+                        </option>
                         {options.map((opt) => (
                           <option key={opt} value={opt}>
                             {opt}
@@ -648,7 +666,6 @@ export const DataBrowsing: React.FC = () => {
 
           {/* 4. 商品核心数据网格/表格 Card */}
           <div className="bg-card text-card-foreground border border-border rounded-lg p-6 shadow-sm flex flex-col justify-between transition-all duration-200 hover:border-primary/20 min-h-[400px] relative">
-
             {/* 顶栏信息 */}
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
               <div className="flex items-center space-x-2">
@@ -687,7 +704,10 @@ export const DataBrowsing: React.FC = () => {
                 <tbody className="divide-y divide-border text-xs">
                   {products.length > 0 ? (
                     products.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors duration-150">
+                      <tr
+                        key={p.id}
+                        className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors duration-150"
+                      >
                         {/* 1. 💡 缩略图显示 (合理大小 w-12 h-12，圆角，支持悬停轻微放大) */}
                         <td className="py-3 px-4 text-center">
                           <div className="relative inline-block w-12 h-12 rounded border border-border bg-muted overflow-hidden shrink-0 group">
@@ -699,7 +719,8 @@ export const DataBrowsing: React.FC = () => {
                                 loading="lazy"
                                 onError={(e) => {
                                   // 图片加载出错时的备用占位符
-                                  (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?q=80&w=200&auto=format&fit=crop'
+                                  ;(e.target as HTMLImageElement).src =
+                                    'https://images.unsplash.com/photo-1594736797933-d0501ba2fe65?q=80&w=200&auto=format&fit=crop'
                                 }}
                               />
                             ) : (
@@ -711,7 +732,10 @@ export const DataBrowsing: React.FC = () => {
                         </td>
 
                         {/* 2. 商品标题 (点击触发展示商品抓取详情 HUD) */}
-                        <td className="py-3 px-4 font-medium text-foreground max-w-sm truncate" title={p.title}>
+                        <td
+                          className="py-3 px-4 font-medium text-foreground max-w-sm truncate"
+                          title={p.title}
+                        >
                           <button
                             onClick={() => setActiveProductDetail(p)}
                             className="hover:underline hover:text-primary text-left font-medium block truncate w-full"
@@ -723,15 +747,17 @@ export const DataBrowsing: React.FC = () => {
                         {/* 3.5. 配送方式 (Seller Type) */}
                         <td className="py-3 px-4 text-center">
                           {p.seller_type ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-extrabold uppercase border ${
-                              p.seller_type.toUpperCase() === 'FBA'
-                                ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50'
-                                : p.seller_type.toUpperCase() === 'FBM'
-                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50'
-                                : p.seller_type.toUpperCase() === 'AMZ'
-                                ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50'
-                                : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                            }`}>
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-extrabold uppercase border ${
+                                p.seller_type.toUpperCase() === 'FBA'
+                                  ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50'
+                                  : p.seller_type.toUpperCase() === 'FBM'
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50'
+                                    : p.seller_type.toUpperCase() === 'AMZ'
+                                      ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50'
+                                      : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                              }`}
+                            >
                               {p.seller_type}
                             </span>
                           ) : (
@@ -745,7 +771,9 @@ export const DataBrowsing: React.FC = () => {
                             <span className="flex items-center justify-end space-x-1">
                               <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                               <span>{p.sellersprite_units.toLocaleString()}</span>
-                              <span className="text-3xs text-muted-foreground font-normal ml-0.5">件</span>
+                              <span className="text-3xs text-muted-foreground font-normal ml-0.5">
+                                件
+                              </span>
                             </span>
                           ) : (
                             <span className="text-muted-foreground/45">-</span>
@@ -754,20 +782,27 @@ export const DataBrowsing: React.FC = () => {
 
                         {/* 3.7. 上架时间天数 (Available Days) */}
                         <td className="py-3 px-4 text-center">
-                          {p.sellersprite_available ? (() => {
-                            const diffDays = Math.max(0, Math.floor((Date.now() - p.sellersprite_available) / (1000 * 60 * 60 * 24)))
-                            const isNew = diffDays <= 90
-                            return (
-                              <span className="flex items-center justify-center space-x-1.5 font-bold text-foreground">
-                                <span>{diffDays}天</span>
-                                {isNew && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-extrabold uppercase bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50 shrink-0">
-                                    新品
-                                  </span>
-                                )}
-                              </span>
-                            )
-                          })() : (
+                          {p.sellersprite_available ? (
+                            (() => {
+                              const diffDays = Math.max(
+                                0,
+                                Math.floor(
+                                  (Date.now() - p.sellersprite_available) / (1000 * 60 * 60 * 24)
+                                )
+                              )
+                              const isNew = diffDays <= 90
+                              return (
+                                <span className="flex items-center justify-center space-x-1.5 font-bold text-foreground">
+                                  <span>{diffDays}天</span>
+                                  {isNew && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-extrabold uppercase bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/50 shrink-0">
+                                      新品
+                                    </span>
+                                  )}
+                                </span>
+                              )
+                            })()
+                          ) : (
                             <span className="text-muted-foreground/45">-</span>
                           )}
                         </td>
@@ -885,159 +920,184 @@ export const DataBrowsing: React.FC = () => {
             <div className="flex-1 overflow-y-auto pr-1.5 my-3 space-y-5">
               {/* Layout */}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-start">
-              {/* Image Large */}
-              <div className="sm:col-span-4 flex justify-center">
-                <div className="w-full aspect-square max-w-[160px] rounded-lg border border-border bg-slate-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden shadow-inner">
-                  {activeProductDetail.image_url ? (
-                    <img
-                      src={activeProductDetail.image_url}
-                      alt={activeProductDetail.asin}
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <Inbox className="w-10 h-10 text-muted-foreground/30" />
-                  )}
-                </div>
-              </div>
-
-              {/* Specs */}
-              <div className="sm:col-span-8 space-y-3.5">
-                <div className="space-y-1">
-                  <span className="text-2xs font-extrabold text-primary uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded">
-                    ASIN: {activeProductDetail.asin}
-                  </span>
-                  <h3 className="font-bold text-sm text-foreground leading-snug">
-                    {activeProductDetail.title}
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3.5 text-2xs border-t border-border pt-3">
-                  <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">商品原始标价</span>
-                    <span className="font-bold text-foreground">
-                      {activeProductDetail.original_price || '未知'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">价格</span>
-                    <span className="font-bold text-foreground">
-                      {formatPrice(activeProductDetail.price_amount, activeProductDetail.currency)}
-                    </span>
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">配送方式</span>
-                    {activeProductDetail.seller_type ? (
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-extrabold uppercase border self-start ${
-                        activeProductDetail.seller_type.toUpperCase() === 'FBA'
-                          ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50'
-                          : activeProductDetail.seller_type.toUpperCase() === 'FBM'
-                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50'
-                          : activeProductDetail.seller_type.toUpperCase() === 'AMZ'
-                          ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50'
-                          : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                      }`}>
-                        {activeProductDetail.seller_type}
-                      </span>
+                {/* Image Large */}
+                <div className="sm:col-span-4 flex justify-center">
+                  <div className="w-full aspect-square max-w-[160px] rounded-lg border border-border bg-slate-50 dark:bg-zinc-900 flex items-center justify-center overflow-hidden shadow-inner">
+                    {activeProductDetail.image_url ? (
+                      <img
+                        src={activeProductDetail.image_url}
+                        alt={activeProductDetail.asin}
+                        className="w-full h-full object-contain"
+                      />
                     ) : (
-                      <span className="font-bold text-foreground">-</span>
+                      <Inbox className="w-10 h-10 text-muted-foreground/30" />
                     )}
                   </div>
+                </div>
 
-                  <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">月销量</span>
-                    {activeProductDetail.sellersprite_units !== undefined && activeProductDetail.sellersprite_units !== null ? (
-                      <span className="font-bold text-foreground flex items-center space-x-1">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                        <span>{activeProductDetail.sellersprite_units.toLocaleString()} 件</span>
+                {/* Specs */}
+                <div className="sm:col-span-8 space-y-3.5">
+                  <div className="space-y-1">
+                    <span className="text-2xs font-extrabold text-primary uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded">
+                      ASIN: {activeProductDetail.asin}
+                    </span>
+                    <h3 className="font-bold text-sm text-foreground leading-snug">
+                      {activeProductDetail.title}
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3.5 text-2xs border-t border-border pt-3">
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground font-semibold block">
+                        商品原始标价
                       </span>
-                    ) : (
-                      <span className="font-bold text-foreground">-</span>
-                    )}
-                  </div>
-
-                  <div className="space-y-0.5">
-                    <span className="text-muted-foreground font-semibold block">数据采集时间</span>
-                    <span className="font-mono text-muted-foreground">
-                      {formatDate(activeProductDetail.crawled_at)}
-                    </span>
-                  </div>
-
-                  <div className="space-y-0.5 col-span-2 border-t border-border/50 pt-2">
-                    <span className="text-muted-foreground font-semibold block">商品上架时间</span>
-                    {renderAvailableField(activeProductDetail.sellersprite_available)}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 pt-2 text-2xs">
-                  <span className="text-muted-foreground font-semibold block">分类</span>
-                  <div className="space-y-1.5">
-                    {activeProductDetail.category_name.split(' | ').map((path, idx) => (
-                      <div key={idx} className="bg-secondary text-secondary-foreground border border-border rounded px-2.5 py-1.5 leading-normal break-all font-medium flex items-center space-x-1.5">
-                        <span className="inline-block w-1 h-1 rounded-full bg-primary shrink-0" />
-                        <span>{path.trim()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* BSR 热销榜排名 */}
-                <div className="space-y-2 pt-3 border-t border-border/50 text-2xs">
-                  <div className="flex items-center space-x-1.5">
-                    <Award className="w-4 h-4 text-amber-500" />
-                    <span className="font-extrabold text-foreground uppercase tracking-wider">
-                      榜单热销排名
-                    </span>
-                  </div>
-
-                  {isLoadingBsr ? (
-                    <div className="flex items-center justify-center py-4 space-x-2 text-3xs text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                      <span>正在从数据库拉取 BSR 关联数据...</span>
+                      <span className="font-bold text-foreground">
+                        {activeProductDetail.original_price || '未知'}
+                      </span>
                     </div>
-                  ) : bsrRanks.length > 0 ? (
-                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                      {bsrRanks.map((rank) => (
-                        <div key={rank.id} className="flex items-start justify-between bg-secondary/50 border border-border rounded p-2.5 gap-3">
-                          <div className="flex items-center space-x-2 shrink-0">
-                            {rank.is_main === 1 ? (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-extrabold bg-amber-500 text-white dark:bg-amber-600 dark:text-amber-50">
-                                主榜
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                                子榜
-                              </span>
-                            )}
-                            <span className="font-extrabold text-foreground text-xs">
-                              No. {rank.rank}
-                            </span>
-                          </div>
 
-                          <div className="flex-1 text-2xs text-muted-foreground leading-normal break-all font-medium text-left">
-                            <a
-                              href={rank.href}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:underline hover:text-primary transition-colors flex items-center gap-1"
-                              title="在亚马逊中打开此榜单"
-                            >
-                              <span>{rank.text}</span>
-                              <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0 inline" />
-                            </a>
-                          </div>
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground font-semibold block">价格</span>
+                      <span className="font-bold text-foreground">
+                        {formatPrice(
+                          activeProductDetail.price_amount,
+                          activeProductDetail.currency
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground font-semibold block">配送方式</span>
+                      {activeProductDetail.seller_type ? (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-3xs font-extrabold uppercase border self-start ${
+                            activeProductDetail.seller_type.toUpperCase() === 'FBA'
+                              ? 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-900/50'
+                              : activeProductDetail.seller_type.toUpperCase() === 'FBM'
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/50'
+                                : activeProductDetail.seller_type.toUpperCase() === 'AMZ'
+                                  ? 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-900/50'
+                                  : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                          }`}
+                        >
+                          {activeProductDetail.seller_type}
+                        </span>
+                      ) : (
+                        <span className="font-bold text-foreground">-</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground font-semibold block">月销量</span>
+                      {activeProductDetail.sellersprite_units !== undefined &&
+                      activeProductDetail.sellersprite_units !== null ? (
+                        <span className="font-bold text-foreground flex items-center space-x-1">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          <span>{activeProductDetail.sellersprite_units.toLocaleString()} 件</span>
+                        </span>
+                      ) : (
+                        <span className="font-bold text-foreground">-</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground font-semibold block">配送天数</span>
+                      <span className="font-bold text-foreground">
+                        {activeProductDetail.delivery_days || '-'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <span className="text-muted-foreground font-semibold block">
+                        数据采集时间
+                      </span>
+                      <span className="font-mono text-muted-foreground">
+                        {formatDate(activeProductDetail.crawled_at)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5 col-span-2 border-t border-border/50 pt-2">
+                      <span className="text-muted-foreground font-semibold block">
+                        商品上架时间
+                      </span>
+                      {renderAvailableField(activeProductDetail.sellersprite_available)}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 pt-2 text-2xs">
+                    <span className="text-muted-foreground font-semibold block">分类</span>
+                    <div className="space-y-1.5">
+                      {activeProductDetail.category_name.split(' | ').map((path, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-secondary text-secondary-foreground border border-border rounded px-2.5 py-1.5 leading-normal break-all font-medium flex items-center space-x-1.5"
+                        >
+                          <span className="inline-block w-1 h-1 rounded-full bg-primary shrink-0" />
+                          <span>{path.trim()}</span>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="text-center py-4 text-3xs text-muted-foreground italic border border-dashed border-border rounded bg-muted/20">
-                      该商品暂无关联的排名记录
+                  </div>
+
+                  {/* BSR 热销榜排名 */}
+                  <div className="space-y-2 pt-3 border-t border-border/50 text-2xs">
+                    <div className="flex items-center space-x-1.5">
+                      <Award className="w-4 h-4 text-amber-500" />
+                      <span className="font-extrabold text-foreground uppercase tracking-wider">
+                        榜单热销排名
+                      </span>
                     </div>
-                  )}
+
+                    {isLoadingBsr ? (
+                      <div className="flex items-center justify-center py-4 space-x-2 text-3xs text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <span>正在从数据库拉取 BSR 关联数据...</span>
+                      </div>
+                    ) : bsrRanks.length > 0 ? (
+                      <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                        {bsrRanks.map((rank) => (
+                          <div
+                            key={rank.id}
+                            className="flex items-start justify-between bg-secondary/50 border border-border rounded p-2.5 gap-3"
+                          >
+                            <div className="flex items-center space-x-2 shrink-0">
+                              {rank.is_main === 1 ? (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-extrabold bg-amber-500 text-white dark:bg-amber-600 dark:text-amber-50">
+                                  主榜
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-3xs font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                                  子榜
+                                </span>
+                              )}
+                              <span className="font-extrabold text-foreground text-xs">
+                                No. {rank.rank}
+                              </span>
+                            </div>
+
+                            <div className="flex-1 text-2xs text-muted-foreground leading-normal break-all font-medium text-left">
+                              <a
+                                href={rank.href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:underline hover:text-primary transition-colors flex items-center gap-1"
+                                title="在亚马逊中打开此榜单"
+                              >
+                                <span>{rank.text}</span>
+                                <ExternalLink className="w-3 h-3 text-muted-foreground shrink-0 inline" />
+                              </a>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-3xs text-muted-foreground italic border border-dashed border-border rounded bg-muted/20">
+                        该商品暂无关联的排名记录
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
 
             {/* Bottom Actions */}
