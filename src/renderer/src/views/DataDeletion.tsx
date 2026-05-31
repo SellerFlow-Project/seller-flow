@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   Trash2,
-  ShieldCheck,
   Database,
   AlertTriangle,
   History,
