@@ -1,0 +1,518 @@
+import { join } from 'path'
+import { app } from 'electron'
+import Database from 'better-sqlite3'
+import { DATABASE_FILE_NAME, DATABASE_SCHEMA_SQL, PRODUCT_SORT_COLUMNS } from '../config/database'
+import type {
+  CrawledProductRow,
+  CrawlTaskRow,
+  CrawlTaskStatus,
+  DatabaseStatistics,
+  IncomingCrawledProduct,
+  ProductBsrRankRow,
+  ProductQueryFilter,
+  SellerSpriteAccountRow,
+  SellerSpriteAccountStatus
+} from '../types/database'
+import { getErrorMessage } from '../utils/error'
+import { parsePriceField } from '../utils/price'
+
+export { parsePriceField } from '../utils/price'
+export type {
+  CrawledProductRow,
+  CrawlTaskRow,
+  CrawlTaskStatus,
+  DatabaseStatistics,
+  IncomingCrawledProduct,
+  ParsedPrice,
+  ProductQueryFilter,
+  ProductBsrRankRow,
+  SellerSpriteAccountRow,
+  SellerSpriteAccountStatus
+} from '../types/database'
+
+/**
+ * 核心数据库服务模块 (Main 进程 - Thread safe & Synchronous SQL Execution)
+ * 采用 better-sqlite3 驱动，支持事务、高频批量写入、索引加速和级联删除
+ */
+class DatabaseService {
+  private db: Database.Database | null = null
+  private dbPath: string = ''
+
+  /**
+   * 初始化数据库并设置物理路径，创建表及索引
+   * @param customPath 自定义物理存储路径 (供单元测试或物理迁移预留)
+   */
+  public initDatabase(customPath?: string): void {
+    try {
+      this.dbPath = customPath || join(app.getPath('userData'), DATABASE_FILE_NAME)
+      console.log(`[DatabaseService] 开始初始化 SQLite 数据库, 物理路径: ${this.dbPath}`)
+
+      // 创建并连接 SQLite 数据库
+      this.db = new Database(this.dbPath)
+
+      // 开启外键关联约束 (SQLite 默认关闭外键约束，开启后支持 ON DELETE CASCADE)
+      this.db.pragma('foreign_keys = ON')
+      // 开启 WAL 写入预留日志，大幅提升高频写入速度
+      this.db.pragma('journal_mode = WAL')
+
+      // 执行建表与索引事务脚本 (按用户要求删除了 max_pages 字段)
+      this.db.exec(DATABASE_SCHEMA_SQL)
+      this.ensureRuntimeSchemaCompatibility(this.db)
+
+      console.log('[DatabaseService] SQLite 数据库建表与性能索引初始化成功！')
+    } catch (error) {
+      console.error('[DatabaseService] SQLite 初始化异常失败:', getErrorMessage(error))
+    }
+  }
+
+  /**
+   * 确保数据库已正常打开的校验断言
+   */
+  private assertDb(): Database.Database {
+    if (!this.db) {
+      this.initDatabase()
+    }
+    if (!this.db) {
+      throw new Error('SQLite 数据库初始化就绪失败！')
+    }
+    return this.db
+  }
+
+  private ensureRuntimeSchemaCompatibility(db: Database.Database): void {
+    const productColumns = new Set(
+      (
+        db.prepare('PRAGMA table_info(crawled_products)').all() as Array<{
+          name: string
+        }>
+      ).map((column) => column.name)
+    )
+
+    const missingColumns: Array<{ name: string; sql: string }> = [
+      { name: 'seller_type', sql: 'ALTER TABLE crawled_products ADD COLUMN seller_type TEXT' },
+      {
+        name: 'sellersprite_units',
+        sql: 'ALTER TABLE crawled_products ADD COLUMN sellersprite_units INTEGER'
+      },
+      {
+        name: 'sellersprite_available',
+        sql: 'ALTER TABLE crawled_products ADD COLUMN sellersprite_available INTEGER'
+      },
+      {
+        name: 'has_sellersprite_data',
+        sql: 'ALTER TABLE crawled_products ADD COLUMN has_sellersprite_data INTEGER NOT NULL DEFAULT 0'
+      }
+    ]
+
+    for (const column of missingColumns) {
+      if (!productColumns.has(column.name)) {
+        db.exec(column.sql)
+      }
+    }
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_products_sellersprite_flag ON crawled_products(has_sellersprite_data);
+
+      CREATE TABLE IF NOT EXISTS product_bsr_ranks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        task_id INTEGER NOT NULL,
+        asin TEXT NOT NULL,
+        rank INTEGER NOT NULL,
+        is_main INTEGER NOT NULL DEFAULT 0 CHECK(is_main IN (0, 1)),
+        bsr_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        text TEXT NOT NULL,
+        href TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        FOREIGN KEY (product_id) REFERENCES crawled_products(id) ON DELETE CASCADE,
+        FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
+        UNIQUE(product_id, bsr_id, rank, is_main)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_bsr_product_id ON product_bsr_ranks(product_id);
+      CREATE INDEX IF NOT EXISTS idx_bsr_task_id ON product_bsr_ranks(task_id);
+      CREATE INDEX IF NOT EXISTS idx_bsr_id_rank ON product_bsr_ranks(bsr_id, rank);
+      CREATE INDEX IF NOT EXISTS idx_bsr_is_main ON product_bsr_ranks(is_main);
+    `)
+  }
+
+  /**
+   * 新建一个采集任务日志
+   * @returns 自动插入的自增 ID (作为主键)
+   */
+  public createTask(taskName: string, taskType: string, marketplace: string): number {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      INSERT INTO crawl_tasks (task_name, task_type, marketplace, status)
+      VALUES (?, ?, ?, 'running')
+    `)
+    const result = stmt.run(taskName, taskType, marketplace)
+    return result.lastInsertRowid as number
+  }
+
+  /**
+   * 更新采集任务状态和结束时间
+   */
+  public updateTaskStatus(taskId: number, status: Exclude<CrawlTaskStatus, 'running'>): void {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      UPDATE crawl_tasks
+      SET status = ?, completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `)
+    stmt.run(status, taskId)
+  }
+
+  /**
+   * 批量高效插入采集到的商品明细 (利用 better-sqlite3 Transaction 特性提速)
+   */
+  public insertProducts(
+    taskId: number,
+    products: IncomingCrawledProduct[],
+    categoryName: string
+  ): void {
+    const db = this.assertDb()
+    const insertStmt = db.prepare(`
+      INSERT INTO crawled_products (
+        task_id,
+        asin,
+        rank,
+        title,
+        currency,
+        price_amount,
+        original_price,
+        image_url,
+        product_url,
+        category_name,
+        seller_type,
+        sellersprite_units,
+        sellersprite_available,
+        has_sellersprite_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(task_id, asin) DO UPDATE SET
+        rank = excluded.rank,
+        title = excluded.title,
+        currency = excluded.currency,
+        price_amount = excluded.price_amount,
+        original_price = excluded.original_price,
+        image_url = excluded.image_url,
+        product_url = excluded.product_url,
+        category_name = CASE
+          WHEN crawled_products.category_name LIKE '%' || excluded.category_name || '%' THEN crawled_products.category_name
+          ELSE category_name || ' | ' || excluded.category_name
+        END,
+        seller_type = CASE
+          WHEN excluded.has_sellersprite_data = 1 THEN excluded.seller_type
+          ELSE crawled_products.seller_type
+        END,
+        sellersprite_units = CASE
+          WHEN excluded.has_sellersprite_data = 1 THEN excluded.sellersprite_units
+          ELSE crawled_products.sellersprite_units
+        END,
+        sellersprite_available = CASE
+          WHEN excluded.has_sellersprite_data = 1 THEN excluded.sellersprite_available
+          ELSE crawled_products.sellersprite_available
+        END,
+        has_sellersprite_data = CASE
+          WHEN excluded.has_sellersprite_data = 1 THEN 1
+          ELSE crawled_products.has_sellersprite_data
+        END
+    `)
+    const selectProductIdStmt = db.prepare(`
+      SELECT id FROM crawled_products WHERE task_id = ? AND asin = ?
+    `)
+    const deleteBsrStmt = db.prepare('DELETE FROM product_bsr_ranks WHERE product_id = ?')
+    const insertBsrStmt = db.prepare(`
+      INSERT INTO product_bsr_ranks (
+        product_id, task_id, asin, rank, is_main, bsr_id, label, text, href
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(product_id, bsr_id, rank, is_main) DO UPDATE SET
+        label = excluded.label,
+        text = excluded.text,
+        href = excluded.href
+    `)
+
+    // 利用更好性能的 SQLite 事务锁批量入库
+    const transaction = db.transaction((items) => {
+      for (const item of items) {
+        // 解耦货币类型和数字价格
+        const rawPrice = item.price || ''
+        const { currency, amount } = parsePriceField(rawPrice)
+        const sellerSprite = item.sellerSprite
+        const hasSellerSpriteData = sellerSprite ? 1 : 0
+
+        insertStmt.run(
+          taskId,
+          item.asin || '',
+          item.rank || 0,
+          item.title || '',
+          currency,
+          amount,
+          rawPrice,
+          item.image || '',
+          item.productUrl || '',
+          categoryName,
+          sellerSprite?.sellerType || null,
+          sellerSprite?.units ?? null,
+          sellerSprite?.available ?? null,
+          hasSellerSpriteData
+        )
+
+        const productIdRow = selectProductIdStmt.get(taskId, item.asin || '') as
+          | { id: number }
+          | undefined
+
+        if (!productIdRow || !sellerSprite) continue
+
+        deleteBsrStmt.run(productIdRow.id)
+        for (const bsr of sellerSprite.bsrList) {
+          insertBsrStmt.run(
+            productIdRow.id,
+            taskId,
+            item.asin || '',
+            bsr.rank,
+            bsr.main ? 1 : 0,
+            bsr.id,
+            bsr.label,
+            bsr.text,
+            bsr.href
+          )
+        }
+      }
+    })
+
+    transaction(products)
+  }
+
+  /**
+   * 获取所有采集任务列表 (排序以最新创建的优先)
+   */
+  public queryTasks(): CrawlTaskRow[] {
+    const db = this.assertDb()
+    const stmt = db.prepare('SELECT * FROM crawl_tasks ORDER BY created_at DESC')
+    return stmt.all() as CrawlTaskRow[]
+  }
+
+  /**
+   * 获取指定任务下的所有去重分类路径
+   */
+  public queryCategories(taskId: number): string[] {
+    const db = this.assertDb()
+    const stmt = db.prepare('SELECT DISTINCT category_name FROM crawled_products WHERE task_id = ?')
+    const rows = stmt.all(taskId) as { category_name: string }[]
+    return rows.map((r) => r.category_name)
+  }
+
+  public querySellerTypes(taskId: number): string[] {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      SELECT DISTINCT seller_type 
+      FROM crawled_products 
+      WHERE task_id = ? 
+        AND seller_type IS NOT NULL 
+        AND seller_type != '' 
+        AND UPPER(seller_type) != 'NA' 
+        AND UPPER(seller_type) != 'N/A'
+    `)
+    const rows = stmt.all(taskId) as { seller_type: string }[]
+    return rows.map((r) => r.seller_type)
+  }
+
+  /**
+   * 删除采集任务。
+   * 💡 由于开启了 ON DELETE CASCADE，删除该任务会自动级联物理清理所有关联商品！
+   */
+  public deleteTask(taskId: number): void {
+    const db = this.assertDb()
+    const stmt = db.prepare('DELETE FROM crawl_tasks WHERE id = ?')
+    stmt.run(taskId)
+  }
+
+  /**
+   * 多维模糊搜索、类目过滤与高响应价格排序商品网格查询
+   */
+  public queryProducts(filter?: ProductQueryFilter): { total: number; list: CrawledProductRow[] } {
+    const db = this.assertDb()
+    const params: Array<string | number> = []
+    const whereClauses: string[] = []
+
+    if (filter?.taskId) {
+      whereClauses.push('task_id = ?')
+      params.push(filter.taskId)
+    }
+
+    if (filter?.query) {
+      whereClauses.push('(asin LIKE ? OR title LIKE ?)')
+      const likeQuery = `%${filter.query}%`
+      params.push(likeQuery, likeQuery)
+    }
+
+    if (filter?.category) {
+      // 💡 支持层级分类与复合分类匹配：精确匹配、作为父分类前缀匹配、或者在合流分类(A | B)中匹配
+      whereClauses.push(
+        '(category_name = ? OR category_name LIKE ? OR category_name LIKE ? OR category_name LIKE ?)'
+      )
+      params.push(
+        filter.category,
+        `${filter.category} > %`,
+        `%| ${filter.category}`,
+        `%| ${filter.category} > %`
+      )
+    }
+
+    if (filter?.minPrice !== undefined) {
+      whereClauses.push('price_amount >= ?')
+      params.push(filter.minPrice)
+    }
+
+    if (filter?.maxPrice !== undefined) {
+      whereClauses.push('price_amount <= ?')
+      params.push(filter.maxPrice)
+    }
+
+    if (filter?.hasSellerSpriteData !== undefined) {
+      whereClauses.push('has_sellersprite_data = ?')
+      params.push(filter.hasSellerSpriteData ? 1 : 0)
+    }
+
+    if (filter?.sellerType) {
+      whereClauses.push('seller_type = ?')
+      params.push(filter.sellerType)
+    }
+
+    const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
+
+    // 1. 获取总条数
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM crawled_products ${whereStr}`)
+    const totalResult = countStmt.get(...params) as { total: number }
+    const total = totalResult ? totalResult.total : 0
+
+    // 2. 拼接排序与分页 SQL 语句
+    const requestedSortBy = filter?.sortBy || 'id'
+    const sortBy = PRODUCT_SORT_COLUMNS.has(requestedSortBy) ? requestedSortBy : 'id'
+    const sortOrder = filter?.sortOrder === 'DESC' ? 'DESC' : 'ASC'
+    const limit = filter?.limit || 50
+    const offset = filter?.offset || 0
+
+    // better-sqlite3 预编译参数防 SQL 注入
+    const querySql = `
+      SELECT * FROM crawled_products
+      ${whereStr}
+      ORDER BY ${sortBy} ${sortOrder}
+      LIMIT ? OFFSET ?
+    `
+    const listParams = [...params, limit, offset]
+    const listStmt = db.prepare(querySql)
+    const list = listStmt.all(...listParams) as CrawledProductRow[]
+
+    return { total, list }
+  }
+
+  /**
+   * 获取全局仪表盘统计数据 (任务数、SKU总数、多站点汇总等)
+   */
+  public getStatistics(): DatabaseStatistics {
+    const db = this.assertDb()
+    const totalTasksResult = db.prepare('SELECT COUNT(*) as cnt FROM crawl_tasks').get() as {
+      cnt: number
+    }
+    const totalProductsResult = db
+      .prepare('SELECT COUNT(*) as cnt FROM crawled_products')
+      .get() as { cnt: number }
+
+    // 额外统计平均价格
+    const avgPriceResult = db
+      .prepare('SELECT AVG(price_amount) as avgPrice FROM crawled_products WHERE price_amount > 0')
+      .get() as { avgPrice: number }
+
+    return {
+      totalTasks: totalTasksResult ? totalTasksResult.cnt : 0,
+      totalSKUs: totalProductsResult ? totalProductsResult.cnt : 0,
+      avgPrice:
+        avgPriceResult && avgPriceResult.avgPrice
+          ? parseFloat(avgPriceResult.avgPrice.toFixed(2))
+          : 0
+    }
+  }
+
+  /**
+   * 获取所有卖家精灵账号列表
+   */
+  public querySpriteAccounts(): SellerSpriteAccountRow[] {
+    const db = this.assertDb()
+    const stmt = db.prepare('SELECT * FROM sellersprite_accounts ORDER BY created_at DESC')
+    return stmt.all() as SellerSpriteAccountRow[]
+  }
+
+  public queryProductBsrRanks(productId: number): ProductBsrRankRow[] {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      SELECT * FROM product_bsr_ranks
+      WHERE product_id = ?
+      ORDER BY is_main DESC, rank ASC
+    `)
+    return stmt.all(productId) as ProductBsrRankRow[]
+  }
+
+  /**
+   * 新增一个卖家精灵账号
+   */
+  public createSpriteAccount(username: string, password: string): number {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      INSERT INTO sellersprite_accounts (username, password, status)
+      VALUES (?, ?, 'normal')
+    `)
+    const result = stmt.run(username, password)
+    return result.lastInsertRowid as number
+  }
+
+  /**
+   * 删除指定卖家精灵账号
+   */
+  public deleteSpriteAccount(id: number): void {
+    const db = this.assertDb()
+    const stmt = db.prepare('DELETE FROM sellersprite_accounts WHERE id = ?')
+    stmt.run(id)
+  }
+
+  /**
+   * 一键清理卖家精灵账号
+   */
+  public clearSpriteAccounts(scope: 'all' | Extract<SellerSpriteAccountStatus, 'invalid'>): void {
+    const db = this.assertDb()
+    if (scope === 'all') {
+      const stmt = db.prepare('DELETE FROM sellersprite_accounts')
+      stmt.run()
+    } else {
+      const stmt = db.prepare("DELETE FROM sellersprite_accounts WHERE status = 'invalid'")
+      stmt.run()
+    }
+  }
+
+  /**
+   * 更新卖家精灵账号状态
+   */
+  public updateSpriteAccountStatus(id: number, status: SellerSpriteAccountStatus): void {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      UPDATE sellersprite_accounts
+      SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE id = ?
+    `)
+    stmt.run(status, id)
+  }
+
+  /**
+   * 清空商品数据缓存与执行 SQLite 清理回收
+   */
+  public clearCache(): void {
+    const db = this.assertDb()
+    console.log('[DatabaseService] 开始执行 SQLite 系统减肥物理吸尘真空回收...')
+    // 物理清理历史游离数据并执行数据库真空整理，缩减 sellerflow.db 的物理磁盘体积
+    db.exec('VACUUM')
+    console.log('[DatabaseService] SQLite VACUUM 释放物理空间完毕！')
+  }
+}
+
+export const databaseService = new DatabaseService()
