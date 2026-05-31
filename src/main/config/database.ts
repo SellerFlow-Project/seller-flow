@@ -1,5 +1,53 @@
 export const DATABASE_FILE_NAME = 'seller-flow.db'
 
+export const CRAWL_TASK_STATUS = {
+  RUNNING: 'running',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  CANCELLED: 'cancelled'
+} as const
+
+export const SELLERSPRITE_ACCOUNT_STATUS = {
+  NORMAL: 'normal',
+  INVALID: 'invalid'
+} as const
+
+export const SQLITE_BOOLEAN = {
+  FALSE: 0,
+  TRUE: 1
+} as const
+
+export const PRODUCT_QUERY_DEFAULT = {
+  SORT_BY: 'id',
+  SORT_ORDER: 'ASC',
+  LIMIT: 50,
+  OFFSET: 0
+} as const
+
+export const PRODUCT_SORT_ORDER = {
+  ASC: 'ASC',
+  DESC: 'DESC'
+} as const
+
+export const DATABASE_STATISTICS_DECIMAL_PLACES = 2
+
+export const DATABASE_AFFECTED_ROWS = {
+  NONE: 0,
+  SINGLE: 1
+} as const
+
+export const SPRITE_ACCOUNT_CLEAR_SCOPE = {
+  ALL: 'all',
+  INVALID: SELLERSPRITE_ACCOUNT_STATUS.INVALID
+} as const
+
+function toSqlTextList(values: readonly string[]): string {
+  return values.map((value) => `'${value}'`).join(', ')
+}
+
+const CRAWL_TASK_STATUS_SQL = toSqlTextList(Object.values(CRAWL_TASK_STATUS))
+const SELLERSPRITE_ACCOUNT_STATUS_SQL = toSqlTextList(Object.values(SELLERSPRITE_ACCOUNT_STATUS))
+
 export const PRODUCT_SORT_COLUMNS = new Set([
   'id',
   'task_id',
@@ -25,7 +73,7 @@ export const DATABASE_SCHEMA_SQL = `
     task_name TEXT NOT NULL UNIQUE,
     task_type TEXT NOT NULL,
     marketplace TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),
+    status TEXT NOT NULL CHECK(status IN (${CRAWL_TASK_STATUS_SQL})),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     completed_at TEXT
   );
@@ -45,7 +93,7 @@ export const DATABASE_SCHEMA_SQL = `
     seller_type TEXT,
     sellersprite_units INTEGER,
     sellersprite_available INTEGER,
-    has_sellersprite_data INTEGER NOT NULL DEFAULT 0 CHECK(has_sellersprite_data IN (0, 1)),
+    has_sellersprite_data INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(has_sellersprite_data IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
     crawled_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
     UNIQUE(task_id, asin)
@@ -62,7 +110,7 @@ export const DATABASE_SCHEMA_SQL = `
     task_id INTEGER NOT NULL,
     asin TEXT NOT NULL,
     rank INTEGER NOT NULL,
-    is_main INTEGER NOT NULL DEFAULT 0 CHECK(is_main IN (0, 1)),
+    is_main INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(is_main IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
     bsr_id TEXT NOT NULL,
     label TEXT NOT NULL,
     text TEXT NOT NULL,
@@ -82,7 +130,7 @@ export const DATABASE_SCHEMA_SQL = `
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     password TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('normal', 'invalid')) DEFAULT 'normal',
+    status TEXT NOT NULL CHECK(status IN (${SELLERSPRITE_ACCOUNT_STATUS_SQL})) DEFAULT '${SELLERSPRITE_ACCOUNT_STATUS.NORMAL}',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
   );

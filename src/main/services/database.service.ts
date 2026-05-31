@@ -1,7 +1,19 @@
 import { join } from 'path'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
-import { DATABASE_FILE_NAME, DATABASE_SCHEMA_SQL, PRODUCT_SORT_COLUMNS } from '../config/database'
+import {
+  CRAWL_TASK_STATUS,
+  DATABASE_STATISTICS_DECIMAL_PLACES,
+  DATABASE_FILE_NAME,
+  DATABASE_SCHEMA_SQL,
+  PRODUCT_QUERY_DEFAULT,
+  PRODUCT_SORT_COLUMNS,
+  PRODUCT_SORT_ORDER,
+  SELLERSPRITE_ACCOUNT_STATUS,
+  SPRITE_ACCOUNT_CLEAR_SCOPE,
+  SQLITE_BOOLEAN
+} from '../config/database'
+import type { CrawlTaskType } from '../types/crawler'
 import type {
   CrawledProductRow,
   CrawlTaskRow,
@@ -11,7 +23,8 @@ import type {
   ProductBsrRankRow,
   ProductQueryFilter,
   SellerSpriteAccountRow,
-  SellerSpriteAccountStatus
+  SellerSpriteAccountStatus,
+  SpriteAccountClearScope
 } from '../types/database'
 import { getErrorMessage } from '../utils/error'
 import { parsePriceField } from '../utils/price'
@@ -27,7 +40,8 @@ export type {
   ProductQueryFilter,
   ProductBsrRankRow,
   SellerSpriteAccountRow,
-  SellerSpriteAccountStatus
+  SellerSpriteAccountStatus,
+  SpriteAccountClearScope
 } from '../types/database'
 
 /**
@@ -37,6 +51,7 @@ export type {
 class DatabaseService {
   private db: Database.Database | null = null
   private dbPath: string = ''
+  private readonly recoveredDbPaths = new Set<string>()
 
   /**
    * 初始化数据库并设置物理路径，创建表及索引
@@ -58,10 +73,18 @@ class DatabaseService {
       // 执行建表与索引事务脚本 (按用户要求删除了 max_pages 字段)
       this.db.exec(DATABASE_SCHEMA_SQL)
       this.ensureRuntimeSchemaCompatibility(this.db)
+      this.recoverInterruptedTasks(this.db)
 
       console.log('[DatabaseService] SQLite 数据库建表与性能索引初始化成功！')
     } catch (error) {
       console.error('[DatabaseService] SQLite 初始化异常失败:', getErrorMessage(error))
+      try {
+        this.db?.close()
+      } catch (closeError) {
+        console.error('[DatabaseService] SQLite 异常连接关闭失败:', getErrorMessage(closeError))
+      }
+      this.db = null
+      throw error
     }
   }
 
@@ -99,7 +122,7 @@ class DatabaseService {
       },
       {
         name: 'has_sellersprite_data',
-        sql: 'ALTER TABLE crawled_products ADD COLUMN has_sellersprite_data INTEGER NOT NULL DEFAULT 0'
+        sql: `ALTER TABLE crawled_products ADD COLUMN has_sellersprite_data INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE}`
       }
     ]
 
@@ -118,7 +141,7 @@ class DatabaseService {
         task_id INTEGER NOT NULL,
         asin TEXT NOT NULL,
         rank INTEGER NOT NULL,
-        is_main INTEGER NOT NULL DEFAULT 0 CHECK(is_main IN (0, 1)),
+        is_main INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(is_main IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
         bsr_id TEXT NOT NULL,
         label TEXT NOT NULL,
         text TEXT NOT NULL,
@@ -136,31 +159,48 @@ class DatabaseService {
     `)
   }
 
+  private recoverInterruptedTasks(db: Database.Database): void {
+    if (this.recoveredDbPaths.has(this.dbPath)) return
+
+    db.prepare(
+      `
+      UPDATE crawl_tasks
+      SET status = ?, completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+      WHERE status = ?
+    `
+    ).run(CRAWL_TASK_STATUS.FAILED, CRAWL_TASK_STATUS.RUNNING)
+    this.recoveredDbPaths.add(this.dbPath)
+  }
+
   /**
    * 新建一个采集任务日志
    * @returns 自动插入的自增 ID (作为主键)
    */
-  public createTask(taskName: string, taskType: string, marketplace: string): number {
+  public createTask(taskName: string, taskType: CrawlTaskType, marketplace: string): number {
     const db = this.assertDb()
     const stmt = db.prepare(`
       INSERT INTO crawl_tasks (task_name, task_type, marketplace, status)
-      VALUES (?, ?, ?, 'running')
+      VALUES (?, ?, ?, ?)
     `)
-    const result = stmt.run(taskName, taskType, marketplace)
+    const result = stmt.run(taskName, taskType, marketplace, CRAWL_TASK_STATUS.RUNNING)
     return result.lastInsertRowid as number
   }
 
   /**
    * 更新采集任务状态和结束时间
    */
-  public updateTaskStatus(taskId: number, status: Exclude<CrawlTaskStatus, 'running'>): void {
+  public updateTaskStatus(
+    taskId: number,
+    status: Exclude<CrawlTaskStatus, typeof CRAWL_TASK_STATUS.RUNNING>
+  ): boolean {
     const db = this.assertDb()
     const stmt = db.prepare(`
       UPDATE crawl_tasks
       SET status = ?, completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
-      WHERE id = ?
+      WHERE id = ? AND status = ?
     `)
-    stmt.run(status, taskId)
+    const result = stmt.run(status, taskId, CRAWL_TASK_STATUS.RUNNING)
+    return result.changes > 0
   }
 
   /**
@@ -202,19 +242,19 @@ class DatabaseService {
           ELSE category_name || ' | ' || excluded.category_name
         END,
         seller_type = CASE
-          WHEN excluded.has_sellersprite_data = 1 THEN excluded.seller_type
+          WHEN excluded.has_sellersprite_data = ${SQLITE_BOOLEAN.TRUE} THEN excluded.seller_type
           ELSE crawled_products.seller_type
         END,
         sellersprite_units = CASE
-          WHEN excluded.has_sellersprite_data = 1 THEN excluded.sellersprite_units
+          WHEN excluded.has_sellersprite_data = ${SQLITE_BOOLEAN.TRUE} THEN excluded.sellersprite_units
           ELSE crawled_products.sellersprite_units
         END,
         sellersprite_available = CASE
-          WHEN excluded.has_sellersprite_data = 1 THEN excluded.sellersprite_available
+          WHEN excluded.has_sellersprite_data = ${SQLITE_BOOLEAN.TRUE} THEN excluded.sellersprite_available
           ELSE crawled_products.sellersprite_available
         END,
         has_sellersprite_data = CASE
-          WHEN excluded.has_sellersprite_data = 1 THEN 1
+          WHEN excluded.has_sellersprite_data = ${SQLITE_BOOLEAN.TRUE} THEN ${SQLITE_BOOLEAN.TRUE}
           ELSE crawled_products.has_sellersprite_data
         END
     `)
@@ -239,7 +279,7 @@ class DatabaseService {
         const rawPrice = item.price || ''
         const { currency, amount } = parsePriceField(rawPrice)
         const sellerSprite = item.sellerSprite
-        const hasSellerSpriteData = sellerSprite ? 1 : 0
+        const hasSellerSpriteData = sellerSprite ? SQLITE_BOOLEAN.TRUE : SQLITE_BOOLEAN.FALSE
 
         insertStmt.run(
           taskId,
@@ -271,7 +311,7 @@ class DatabaseService {
             taskId,
             item.asin || '',
             bsr.rank,
-            bsr.main ? 1 : 0,
+            bsr.main ? SQLITE_BOOLEAN.TRUE : SQLITE_BOOLEAN.FALSE,
             bsr.id,
             bsr.label,
             bsr.text,
@@ -372,7 +412,7 @@ class DatabaseService {
 
     if (filter?.hasSellerSpriteData !== undefined) {
       whereClauses.push('has_sellersprite_data = ?')
-      params.push(filter.hasSellerSpriteData ? 1 : 0)
+      params.push(filter.hasSellerSpriteData ? SQLITE_BOOLEAN.TRUE : SQLITE_BOOLEAN.FALSE)
     }
 
     if (filter?.sellerType) {
@@ -388,11 +428,16 @@ class DatabaseService {
     const total = totalResult ? totalResult.total : 0
 
     // 2. 拼接排序与分页 SQL 语句
-    const requestedSortBy = filter?.sortBy || 'id'
-    const sortBy = PRODUCT_SORT_COLUMNS.has(requestedSortBy) ? requestedSortBy : 'id'
-    const sortOrder = filter?.sortOrder === 'DESC' ? 'DESC' : 'ASC'
-    const limit = filter?.limit || 50
-    const offset = filter?.offset || 0
+    const requestedSortBy = filter?.sortBy || PRODUCT_QUERY_DEFAULT.SORT_BY
+    const sortBy = PRODUCT_SORT_COLUMNS.has(requestedSortBy)
+      ? requestedSortBy
+      : PRODUCT_QUERY_DEFAULT.SORT_BY
+    const sortOrder =
+      filter?.sortOrder === PRODUCT_SORT_ORDER.DESC
+        ? PRODUCT_SORT_ORDER.DESC
+        : PRODUCT_QUERY_DEFAULT.SORT_ORDER
+    const limit = filter?.limit ?? PRODUCT_QUERY_DEFAULT.LIMIT
+    const offset = filter?.offset ?? PRODUCT_QUERY_DEFAULT.OFFSET
 
     // better-sqlite3 预编译参数防 SQL 注入
     const querySql = `
@@ -430,7 +475,7 @@ class DatabaseService {
       totalSKUs: totalProductsResult ? totalProductsResult.cnt : 0,
       avgPrice:
         avgPriceResult && avgPriceResult.avgPrice
-          ? parseFloat(avgPriceResult.avgPrice.toFixed(2))
+          ? parseFloat(avgPriceResult.avgPrice.toFixed(DATABASE_STATISTICS_DECIMAL_PLACES))
           : 0
     }
   }
@@ -461,9 +506,9 @@ class DatabaseService {
     const db = this.assertDb()
     const stmt = db.prepare(`
       INSERT INTO sellersprite_accounts (username, password, status)
-      VALUES (?, ?, 'normal')
+      VALUES (?, ?, ?)
     `)
-    const result = stmt.run(username, password)
+    const result = stmt.run(username, password, SELLERSPRITE_ACCOUNT_STATUS.NORMAL)
     return result.lastInsertRowid as number
   }
 
@@ -479,14 +524,14 @@ class DatabaseService {
   /**
    * 一键清理卖家精灵账号
    */
-  public clearSpriteAccounts(scope: 'all' | Extract<SellerSpriteAccountStatus, 'invalid'>): void {
+  public clearSpriteAccounts(scope: SpriteAccountClearScope): void {
     const db = this.assertDb()
-    if (scope === 'all') {
+    if (scope === SPRITE_ACCOUNT_CLEAR_SCOPE.ALL) {
       const stmt = db.prepare('DELETE FROM sellersprite_accounts')
       stmt.run()
     } else {
-      const stmt = db.prepare("DELETE FROM sellersprite_accounts WHERE status = 'invalid'")
-      stmt.run()
+      const stmt = db.prepare('DELETE FROM sellersprite_accounts WHERE status = ?')
+      stmt.run(SELLERSPRITE_ACCOUNT_STATUS.INVALID)
     }
   }
 

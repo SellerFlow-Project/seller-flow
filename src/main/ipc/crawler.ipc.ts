@@ -1,7 +1,9 @@
+import { DEFAULT_AMAZON_MARKETPLACE } from '../config/amazon'
+import { IPC_CHANNEL } from '../config/ipc'
 import type { CrawlTaskConfig } from '../types/crawler'
 import { sendCrawlerLog } from '../utils/window-bus'
 import { crawlerService } from '../services/crawler.service'
-import { handleIpc } from './ipc-handler'
+import { createIpcSuccess, handleIpc } from './ipc-handler'
 
 /**
  * 爬虫任务模块 IPC 监听注册
@@ -9,46 +11,46 @@ import { handleIpc } from './ipc-handler'
  */
 export function registerCrawlerIPC(): void {
   // 启动抓取任务 (优化为非阻塞异步后台线程启动，防止 UI 渲染层发生卡死等待)
-  handleIpc('crawler:start-task', (_event, config: CrawlTaskConfig) => {
-    crawlerService
-      .startTask(config, (log) => {
-        sendCrawlerLog(log)
-      })
-      .catch((error) => {
-        console.error('[IPC] 异步后台爬虫任务执行失败:', error)
-      })
-
-    return { success: true }
+  handleIpc(IPC_CHANNEL.CRAWLER.START_TASK, (_event, config: CrawlTaskConfig) => {
+    const result = crawlerService.startTask(config, (log) => {
+      sendCrawlerLog(log)
+    })
+    return createIpcSuccess(result)
   })
 
-  handleIpc('crawler:stop-task', () => {
-    crawlerService.stopTask()
-    return { success: true }
+  handleIpc(IPC_CHANNEL.CRAWLER.STOP_TASK, () => {
+    return createIpcSuccess(crawlerService.stopTask())
   })
 
-  handleIpc('crawler:get-status', () => {
-    return { success: true, ...crawlerService.getStatus(), ...crawlerService.getDfsState() }
+  handleIpc(IPC_CHANNEL.CRAWLER.GET_STATUS, () => {
+    return createIpcSuccess({ ...crawlerService.getStatus(), ...crawlerService.getDfsState() })
   })
 
   // 从亚马逊获取最新的配送地址 Cookie 并链式抓取排行榜页面数据 (支持指定站点)
-  handleIpc('crawler:get-amazon-cookies', async (_event, args?: { marketplace?: string }) => {
-    const marketplace = args?.marketplace || 'JP'
-    console.log(`[IPC] 开始链式调试：动态 Cookie 交换 -> 抓取 ${marketplace} 排行榜 HTML 报文`)
+  handleIpc(
+    IPC_CHANNEL.CRAWLER.GET_AMAZON_COOKIES,
+    async (_event, args?: { marketplace?: string }) => {
+      const marketplace = args?.marketplace || DEFAULT_AMAZON_MARKETPLACE
+      console.log(`[IPC] 开始链式调试：动态 Cookie 交换 -> 抓取 ${marketplace} 排行榜 HTML 报文`)
 
-    const cookieResult = await crawlerService.getAmazonCookies(marketplace)
-    console.log(`[IPC] 携带 Cookie 启动 ${marketplace} 排行榜拉取...`)
+      const cookieResult = await crawlerService.getAmazonCookies(marketplace)
+      console.log(`[IPC] 携带 Cookie 启动 ${marketplace} 排行榜拉取...`)
 
-    const pageResult = await crawlerService.fetchBestSellersPage(cookieResult.cookies, marketplace)
+      const pageResult = await crawlerService.fetchBestSellersPage(
+        cookieResult.cookies,
+        marketplace
+      )
 
-    return {
-      success: cookieResult.success && pageResult.success,
-      cookies: cookieResult.cookies,
-      address: cookieResult.address,
-      error: cookieResult.error || pageResult.error,
-      htmlLength: pageResult.htmlLength,
-      htmlSnippet: pageResult.htmlSnippet,
-      isJapanese: pageResult.isJapanese,
-      categories: pageResult.categories
+      return {
+        success: cookieResult.success && pageResult.success,
+        cookies: cookieResult.cookies,
+        address: cookieResult.address,
+        error: cookieResult.error || pageResult.error,
+        htmlLength: pageResult.htmlLength,
+        htmlSnippet: pageResult.htmlSnippet,
+        isJapanese: pageResult.isJapanese,
+        categories: pageResult.categories
+      }
     }
-  })
+  )
 }

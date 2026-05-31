@@ -1,19 +1,22 @@
+import { CURRENCY, CURRENCY_MARKERS, type Currency } from '../config/price'
 import type { ParsedPrice } from '../types/database'
 
-export function parsePriceField(rawPrice: string, defaultCurrency = 'JPY'): ParsedPrice {
+export function parsePriceField(
+  rawPrice: string,
+  defaultCurrency: Currency = CURRENCY.JPY
+): ParsedPrice {
   if (!rawPrice) return { currency: defaultCurrency, amount: 0 }
 
   let currency = defaultCurrency
   const upperPrice = rawPrice.toUpperCase()
 
-  if (rawPrice.includes('￥') || rawPrice.includes('¥') || upperPrice.includes('JPY')) {
-    currency = 'JPY'
-  } else if (rawPrice.includes('$') || upperPrice.includes('USD')) {
-    currency = 'USD'
-  } else if (rawPrice.includes('£') || upperPrice.includes('GBP')) {
-    currency = 'GBP'
-  } else if (rawPrice.includes('€') || upperPrice.includes('EUR')) {
-    currency = 'EUR'
+  for (const [candidate, markers] of Object.entries(CURRENCY_MARKERS) as Array<
+    [Currency, readonly string[]]
+  >) {
+    if (markers.some((marker) => rawPrice.includes(marker) || upperPrice.includes(marker))) {
+      currency = candidate
+      break
+    }
   }
 
   const numbersOnly = rawPrice.replace(/[^\d.]/g, '')

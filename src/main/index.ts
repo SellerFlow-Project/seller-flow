@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { APP_NAME, APP_USER_MODEL_ID } from './config/app'
+import { IPC_CHANNEL } from './config/ipc'
 import { registerAllIPC } from './ipc'
 import { createMainWindow } from './window/main-window'
 
@@ -30,7 +31,7 @@ app.whenReady().then(() => {
   registerAllIPC()
 
   // IPC smoke-test channel kept for compatibility with electron-vite template tooling.
-  ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.on(IPC_CHANNEL.PING, () => console.log('pong'))
 
   createMainWindow()
 })

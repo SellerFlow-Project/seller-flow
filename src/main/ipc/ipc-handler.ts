@@ -11,6 +11,19 @@ interface IpcHandlerOptions {
   errorPrefix?: string
 }
 
+export function createIpcSuccess(): { success: true }
+export function createIpcSuccess<TPayload extends object>(
+  payload: TPayload
+): { success: true } & TPayload
+export function createIpcSuccess<TPayload extends object>(
+  payload?: TPayload
+): { success: true } | ({ success: true } & TPayload) {
+  return {
+    success: true,
+    ...payload
+  }
+}
+
 export function handleIpc<TArgs extends unknown[], TResult>(
   channel: string,
   handler: IpcHandler<TArgs, TResult>,

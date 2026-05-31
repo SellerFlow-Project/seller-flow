@@ -1,4 +1,6 @@
-export function absolutizeAmazonUrl(url: string, baseUrl = 'https://www.amazon.co.jp'): string {
+import { DEFAULT_AMAZON_BASE_URL } from '../config/amazon'
+
+export function absolutizeAmazonUrl(url: string, baseUrl = DEFAULT_AMAZON_BASE_URL): string {
   if (!url) return ''
 
   try {
@@ -10,7 +12,7 @@ export function absolutizeAmazonUrl(url: string, baseUrl = 'https://www.amazon.c
 
 export function getPageFromHref(href = ''): number | null {
   try {
-    const url = new URL(href, 'https://www.amazon.co.jp')
+    const url = new URL(href, DEFAULT_AMAZON_BASE_URL)
     const page = url.searchParams.get('pg')
     return page ? Number(page) : null
   } catch {

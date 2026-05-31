@@ -2,28 +2,56 @@ import { createHash } from 'crypto'
 import {
   SELLERSPRITE_EXTENSION_BASE_URL,
   SELLERSPRITE_EXTENSION_ID,
+  SELLERSPRITE_HTTP_HEADER_VALUE,
   SELLERSPRITE_LANGUAGE,
   SELLERSPRITE_LOGIN_BASE_URL,
+  SELLERSPRITE_LOGIN_RESULT_CODE,
+  SELLERSPRITE_LOGIN_STATUS,
   SELLERSPRITE_QUICK_VIEW_JP_PATH,
+  SELLERSPRITE_QUICK_VIEW_QUERY,
+  SELLERSPRITE_QUICK_VIEW_STATUS,
+  SELLERSPRITE_RESPONSE_CODE,
   SELLERSPRITE_SOURCE,
   SELLERSPRITE_USER_AGENT,
   SELLERSPRITE_VERSION
 } from '../config/sellersprite'
+import { HTTP_HEADER, HTTP_METHOD, MIME_TYPE } from '../config/http'
 import type {
   SellerSpriteBusinessSignature,
   SellerSpriteLoginResult,
   SellerSpriteQuickViewResponse,
   SellerSpriteQuickViewResult
 } from '../types/sellersprite'
-import { getErrorMessage } from '../utils/error'
+import { getErrorMessage, isAbortError } from '../utils/error'
+import { fetchJson, setUrlSearchParams } from '../utils/http'
 import { calculateBusinessTk, calculateSellerSpriteTk } from './sellersprite/signature'
 
 export { calculateBusinessTk, calculateSellerSpriteTk } from './sellersprite/signature'
 
+const MD5_HEX_LENGTH = 32
+const MD5_HEX_RE = new RegExp(`^[a-f0-9]{${MD5_HEX_LENGTH}}$`, 'i')
+
 function toMd5Password(password: string): string {
-  return /^[a-f0-9]{32}$/i.test(password)
-    ? password
-    : createHash('md5').update(password).digest('hex')
+  return MD5_HEX_RE.test(password) ? password : createHash('md5').update(password).digest('hex')
+}
+
+function getSellerSpriteErrorMessage(response: SellerSpriteQuickViewResponse): string {
+  if (typeof response.message === 'string' && response.message) return response.message
+  if (typeof response.error === 'string' && response.error) return response.error
+  return '用户名或密码错误'
+}
+
+async function fetchSellerSpriteJson(
+  input: string | URL,
+  init?: RequestInit
+): Promise<SellerSpriteQuickViewResponse> {
+  const response = await fetchJson<unknown>(input, init)
+
+  if (!response || typeof response !== 'object') {
+    throw new Error('卖家精灵接口返回格式异常')
+  }
+
+  return response as SellerSpriteQuickViewResponse
 }
 
 export class SellerSpriteService {
@@ -75,7 +103,11 @@ export class SellerSpriteService {
    * @param email 卖家精灵账号邮箱
    * @param password 原始密码或已经经过 MD5 加密后的 32 位密码字符串
    */
-  public async login(email: string, password: string): Promise<SellerSpriteLoginResult> {
+  public async login(
+    email: string,
+    password: string,
+    signal?: AbortSignal
+  ): Promise<SellerSpriteLoginResult> {
     try {
       const passwordMd5 = toMd5Password(password)
       // 拼接登录签名原始串: email + password_md5
@@ -84,60 +116,59 @@ export class SellerSpriteService {
 
       // 卖家精灵标准登录 API 接口
       const loginUrl = new URL(SELLERSPRITE_LOGIN_BASE_URL)
-      loginUrl.searchParams.set('email', email)
-      loginUrl.searchParams.set('password', passwordMd5)
-      loginUrl.searchParams.set('tk', tk)
-      loginUrl.searchParams.set('version', SELLERSPRITE_VERSION)
-      loginUrl.searchParams.set('language', SELLERSPRITE_LANGUAGE)
-      loginUrl.searchParams.set('extension', SELLERSPRITE_EXTENSION_ID)
-      loginUrl.searchParams.set('source', SELLERSPRITE_SOURCE)
+      setUrlSearchParams(loginUrl, {
+        email,
+        password: passwordMd5,
+        tk,
+        version: SELLERSPRITE_VERSION,
+        language: SELLERSPRITE_LANGUAGE,
+        extension: SELLERSPRITE_EXTENSION_ID,
+        source: SELLERSPRITE_SOURCE
+      })
 
       console.log(`[SellerSprite Service] 发起登录请求: email=${email}, tk=${tk}`)
 
-      const response = await fetch(loginUrl, {
-        method: 'GET',
+      const resData = await fetchSellerSpriteJson(loginUrl, {
+        method: HTTP_METHOD.GET,
+        signal,
         headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': SELLERSPRITE_USER_AGENT,
-          Accept: 'application/json'
+          [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.JSON,
+          [HTTP_HEADER.USER_AGENT]: SELLERSPRITE_USER_AGENT,
+          [HTTP_HEADER.ACCEPT]: MIME_TYPE.JSON
         }
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP 异常，状态码: ${response.status}`)
-      }
-
-      const resData = (await response.json()) as SellerSpriteQuickViewResponse
-
-      if (resData && resData.code === 'OK') {
-        const data = resData.data
-        const token = data && typeof data.token === 'string' ? data.token : ''
+      if (resData.code === SELLERSPRITE_RESPONSE_CODE.OK) {
+        const token = typeof resData.data?.token === 'string' ? resData.data.token : ''
         if (!token) {
           return {
-            success: 1,
+            status: SELLERSPRITE_LOGIN_STATUS.CREDENTIAL_ERROR,
+            success: SELLERSPRITE_LOGIN_RESULT_CODE.CREDENTIAL_ERROR,
             message: '登录失败'
           }
         }
 
         return {
+          status: SELLERSPRITE_LOGIN_STATUS.SUCCESS,
           success: true,
           message: '登录成功',
           token,
-          data: data || resData
-        }
-      } else {
-        return {
-          success: 1, // 账号凭证错误，标记为异常状态
-          message:
-            (typeof resData.message === 'string' && resData.message) ||
-            (typeof resData.error === 'string' && resData.error) ||
-            '用户名或密码错误'
+          data: resData.data || resData
         }
       }
+
+      return {
+        status: SELLERSPRITE_LOGIN_STATUS.CREDENTIAL_ERROR,
+        success: SELLERSPRITE_LOGIN_RESULT_CODE.CREDENTIAL_ERROR,
+        message: getSellerSpriteErrorMessage(resData)
+      }
     } catch (error) {
+      if (isAbortError(error)) throw error
+
       console.error('[SellerSprite Service] 登录请求异常:', error)
       return {
-        success: 2, // 网络或服务请求异常
+        status: SELLERSPRITE_LOGIN_STATUS.NETWORK_ERROR,
+        success: SELLERSPRITE_LOGIN_RESULT_CODE.NETWORK_ERROR,
         message: `网络或服务请求异常: ${getErrorMessage(error)}`
       }
     }
@@ -212,7 +243,8 @@ export class SellerSpriteService {
    */
   public async getQuickViewJP(
     asins: string | string[],
-    token?: string
+    token?: string,
+    signal?: AbortSignal
   ): Promise<SellerSpriteQuickViewResult> {
     try {
       const asinsStr = Array.isArray(asins) ? asins.join(',') : asins
@@ -223,47 +255,47 @@ export class SellerSpriteService {
 
       // 卖家精灵 API 全 URL 地址
       const apiUrl = new URL(`${SELLERSPRITE_EXTENSION_BASE_URL}${urlPath}`)
-      apiUrl.searchParams.set('asins', asinsStr)
-      apiUrl.searchParams.set('source', SELLERSPRITE_SOURCE)
-      apiUrl.searchParams.set('miniMode', 'false')
-      apiUrl.searchParams.set('withRelation', 'true')
-      apiUrl.searchParams.set('withSaleTrend', 'false')
-      apiUrl.searchParams.set('tk', tk)
-      apiUrl.searchParams.set('version', SELLERSPRITE_VERSION)
-      apiUrl.searchParams.set('language', SELLERSPRITE_LANGUAGE)
-      apiUrl.searchParams.set('extension', SELLERSPRITE_EXTENSION_ID)
+      setUrlSearchParams(apiUrl, {
+        asins: asinsStr,
+        source: SELLERSPRITE_SOURCE,
+        miniMode: SELLERSPRITE_QUICK_VIEW_QUERY.MINI_MODE,
+        withRelation: SELLERSPRITE_QUICK_VIEW_QUERY.WITH_RELATION,
+        withSaleTrend: SELLERSPRITE_QUICK_VIEW_QUERY.WITH_SALE_TREND,
+        tk,
+        version: SELLERSPRITE_VERSION,
+        language: SELLERSPRITE_LANGUAGE,
+        extension: SELLERSPRITE_EXTENSION_ID
+      })
 
       const headers: Record<string, string> = {
-        'User-Agent': SELLERSPRITE_USER_AGENT,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6'
+        [HTTP_HEADER.USER_AGENT]: SELLERSPRITE_USER_AGENT,
+        [HTTP_HEADER.ACCEPT]: MIME_TYPE.JSON,
+        [HTTP_HEADER.CONTENT_TYPE]: MIME_TYPE.JSON,
+        [HTTP_HEADER.ACCEPT_LANGUAGE]: SELLERSPRITE_HTTP_HEADER_VALUE.ACCEPT_LANGUAGE
       }
 
       const activeToken = token || this.authToken
       if (activeToken) {
-        headers['auth-token'] = activeToken
+        headers[HTTP_HEADER.AUTH_TOKEN] = activeToken
       }
 
-      const response = await fetch(apiUrl, {
-        method: 'GET',
+      const resData = await fetchSellerSpriteJson(apiUrl, {
+        method: HTTP_METHOD.GET,
+        signal,
         headers
       })
 
-      if (!response.ok) {
-        throw new Error(`HTTP 异常，状态码: ${response.status}`)
-      }
-
-      const resData = (await response.json()) as SellerSpriteQuickViewResponse
-
-      const success = resData && resData.code === 'OK'
       return {
-        success,
+        status: SELLERSPRITE_QUICK_VIEW_STATUS.RESPONSE,
+        success: resData.code === SELLERSPRITE_RESPONSE_CODE.OK,
         data: resData
       }
     } catch (error) {
+      if (isAbortError(error)) throw error
+
       console.error(`[SellerSprite Service] JP 快速竞品分析请求异常:`, error)
       return {
+        status: SELLERSPRITE_QUICK_VIEW_STATUS.NETWORK_ERROR,
         success: false,
         error: getErrorMessage(error)
       }

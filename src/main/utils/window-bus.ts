@@ -1,4 +1,5 @@
 import { BrowserWindow } from 'electron'
+import { WINDOW_CHANNEL } from '../config/ipc'
 
 export function sendToFirstWindow(channel: string, payload: unknown): void {
   const [firstWindow] = BrowserWindow.getAllWindows()
@@ -6,7 +7,7 @@ export function sendToFirstWindow(channel: string, payload: unknown): void {
 }
 
 export function sendCrawlerLog(log: string): void {
-  sendToFirstWindow('crawler:log-progress', log)
+  sendToFirstWindow(WINDOW_CHANNEL.CRAWLER_LOG_PROGRESS, log)
 }
 
 export function logAndSendCrawlerLog(log: string): void {

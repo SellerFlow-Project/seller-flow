@@ -7,11 +7,15 @@ import type {
   AmazonPaginationPage,
   AmazonParsedProduct
 } from '../../types/amazon'
+import { AMAZON_ASIN_LENGTH, DEFAULT_AMAZON_BASE_URL } from '../../config/amazon'
+import { CRAWLER_INITIAL_PAGE } from '../../config/crawler'
 import { cleanText } from '../../utils/text'
 import { absolutizeAmazonUrl, getPageFromHref } from '../../utils/url'
 
-const ASIN_RE = /^[A-Z0-9]{10}$/
-const ASIN_FROM_URL_RE = /\/(?:dp|gp\/product)\/([A-Z0-9]{10})(?:[/?]|$)/
+const ASIN_RE = new RegExp(`^[A-Z0-9]{${AMAZON_ASIN_LENGTH}}$`)
+const ASIN_FROM_URL_RE = new RegExp(
+  `/(?:dp|gp/product)/([A-Z0-9]{${AMAZON_ASIN_LENGTH}})(?:[/?]|$)`
+)
 const PRICE_RE = /(?:JP¥|￥|¥)\s?[\d,]+(?:\.\d+)?/
 
 type ElementSelection = Cheerio<Element>
@@ -88,7 +92,7 @@ function findPrice($: CheerioAPI, $card: ElementSelection): string {
 
 export function parseAmazonPagination(
   $: CheerioAPI,
-  currentUrl = 'https://www.amazon.co.jp'
+  currentUrl = DEFAULT_AMAZON_BASE_URL
 ): AmazonPagination {
   const $pagination = $('nav[aria-label="pagination"] ul.a-pagination').first()
 
@@ -137,7 +141,10 @@ export function parseAmazonPagination(
     }
   })
 
-  const currentPage = pages.find((item) => item.isCurrent)?.page || getPageFromHref(currentUrl) || 1
+  const currentPage =
+    pages.find((item) => item.isCurrent)?.page ||
+    getPageFromHref(currentUrl) ||
+    CRAWLER_INITIAL_PAGE
   const $nextLi = $pagination.find('li.a-last').first()
   const nextHref = $nextLi.find('a[href]').first().attr('href') || ''
   const hasNextPage =
@@ -193,7 +200,7 @@ export function parseAmazonBestSellerHtml(html: string): AmazonParsedProduct[] {
 
 export function parseBestsellerCategories(
   html: string,
-  baseUrl = 'https://www.amazon.co.jp'
+  baseUrl = DEFAULT_AMAZON_BASE_URL
 ): AmazonCategory[] {
   const $ = cheerio.load(html)
   const categories: AmazonCategory[] = []
@@ -218,7 +225,7 @@ export function parseBestsellerCategories(
 
 export function parseBestsellerChildCategories(
   html: string,
-  currentUrl = 'https://www.amazon.co.jp'
+  currentUrl = DEFAULT_AMAZON_BASE_URL
 ): AmazonCategory[] {
   const $ = cheerio.load(html)
   const categories: AmazonCategory[] = []

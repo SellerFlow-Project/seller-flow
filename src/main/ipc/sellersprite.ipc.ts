@@ -1,30 +1,53 @@
+import { IPC_CHANNEL } from '../config/ipc'
 import { sellerSpriteService } from '../services/sellersprite.service'
-import { handleIpc } from './ipc-handler'
+import { createIpcSuccess, handleIpc } from './ipc-handler'
+
+interface SignaturePayload {
+  stringToSign: string
+}
+
+interface BusinessSignaturePayload {
+  urlPath: string
+  params?: Record<string, string>
+}
+
+interface LoginPayload {
+  email: string
+  passwordMd5: string
+}
+
+interface QuickViewPayload {
+  asins: string | string[]
+  cookie?: string
+}
 
 /**
  * 卖家精灵 API 模块 IPC 监听注册
  * 提供签名运算、账号联机验证登录以及 API 请求抓取的进程通信通道
  */
 export function registerSellerSpriteIPC(): void {
-  handleIpc('sellersprite:calculate-tk', (_event, { stringToSign }) => {
-    return { success: true, tk: sellerSpriteService.getSignatureTk(stringToSign) }
-  })
-
-  handleIpc('sellersprite:calculate-business-tk', (_event, { urlPath, params }) => {
-    return { success: true, ...sellerSpriteService.getBusinessSignatureTk(urlPath, params || {}) }
+  handleIpc(IPC_CHANNEL.SELLERSPRITE.CALCULATE_TK, (_event, { stringToSign }: SignaturePayload) => {
+    return createIpcSuccess({ tk: sellerSpriteService.getSignatureTk(stringToSign) })
   })
 
   handleIpc(
-    'sellersprite:login',
-    async (_event, { email, passwordMd5 }) => {
+    IPC_CHANNEL.SELLERSPRITE.CALCULATE_BUSINESS_TK,
+    (_event, { urlPath, params }: BusinessSignaturePayload) => {
+      return createIpcSuccess(sellerSpriteService.getBusinessSignatureTk(urlPath, params || {}))
+    }
+  )
+
+  handleIpc(
+    IPC_CHANNEL.SELLERSPRITE.LOGIN,
+    async (_event, { email, passwordMd5 }: LoginPayload) => {
       return await sellerSpriteService.login(email, passwordMd5)
     },
     { errorField: 'message', errorPrefix: '登录桥接通道异常' }
   )
 
   handleIpc(
-    'sellersprite:get-quick-view',
-    async (_event, { asins, cookie }) => {
+    IPC_CHANNEL.SELLERSPRITE.GET_QUICK_VIEW,
+    async (_event, { asins, cookie }: QuickViewPayload) => {
       return await sellerSpriteService.getQuickViewJP(asins, cookie)
     },
     { errorPrefix: '竞品数据请求桥接通道异常' }

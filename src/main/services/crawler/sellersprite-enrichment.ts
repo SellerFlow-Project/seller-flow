@@ -55,9 +55,9 @@ function normalizeSellerSpriteItem(item: SellerSpriteQuickViewItem): ProductSell
 function hasSellerSpritePayload(data: ProductSellerSpriteData): boolean {
   return Boolean(
     data.sellerType ||
-      data.units !== undefined ||
-      data.available !== undefined ||
-      data.bsrList.length > 0
+    data.units !== undefined ||
+    data.available !== undefined ||
+    data.bsrList.length > 0
   )
 }
 

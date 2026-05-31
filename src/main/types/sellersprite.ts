@@ -1,22 +1,31 @@
+import type {
+  SELLERSPRITE_LOGIN_RESULT_CODE,
+  SELLERSPRITE_LOGIN_STATUS,
+  SELLERSPRITE_QUICK_VIEW_STATUS
+} from '../config/sellersprite'
+
 export interface SellerSpriteBusinessSignature {
   stringToSign: string
   tk: string
 }
 
 export interface SellerSpriteLoginSuccess {
+  status: typeof SELLERSPRITE_LOGIN_STATUS.SUCCESS
   success: true
   message: string
-  token?: string
+  token: string
   data?: unknown
 }
 
 export interface SellerSpriteLoginCredentialError {
-  success: 1
+  status: typeof SELLERSPRITE_LOGIN_STATUS.CREDENTIAL_ERROR
+  success: typeof SELLERSPRITE_LOGIN_RESULT_CODE.CREDENTIAL_ERROR
   message: string
 }
 
 export interface SellerSpriteLoginNetworkError {
-  success: 2
+  status: typeof SELLERSPRITE_LOGIN_STATUS.NETWORK_ERROR
+  success: typeof SELLERSPRITE_LOGIN_RESULT_CODE.NETWORK_ERROR
   message: string
 }
 
@@ -25,11 +34,17 @@ export type SellerSpriteLoginResult =
   | SellerSpriteLoginCredentialError
   | SellerSpriteLoginNetworkError
 
-export interface SellerSpriteQuickViewResult<TData = SellerSpriteQuickViewResponse> {
-  success: boolean
-  data?: TData
-  error?: string
-}
+export type SellerSpriteQuickViewResult<TData = SellerSpriteQuickViewResponse> =
+  | {
+      status: typeof SELLERSPRITE_QUICK_VIEW_STATUS.RESPONSE
+      success: boolean
+      data: TData
+    }
+  | {
+      status: typeof SELLERSPRITE_QUICK_VIEW_STATUS.NETWORK_ERROR
+      success: false
+      error: string
+    }
 
 export interface SellerSpriteQuickViewResponse {
   code?: string

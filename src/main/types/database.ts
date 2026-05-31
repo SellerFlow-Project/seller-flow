@@ -1,8 +1,22 @@
-export type CrawlTaskStatus = 'running' | 'completed' | 'failed' | 'cancelled'
-export type SellerSpriteAccountStatus = 'normal' | 'invalid'
+import type {
+  CRAWL_TASK_STATUS,
+  PRODUCT_SORT_ORDER,
+  SELLERSPRITE_ACCOUNT_STATUS,
+  SPRITE_ACCOUNT_CLEAR_SCOPE,
+  SQLITE_BOOLEAN
+} from '../config/database'
+import type { Currency } from '../config/price'
+
+export type CrawlTaskStatus = (typeof CRAWL_TASK_STATUS)[keyof typeof CRAWL_TASK_STATUS]
+export type SellerSpriteAccountStatus =
+  (typeof SELLERSPRITE_ACCOUNT_STATUS)[keyof typeof SELLERSPRITE_ACCOUNT_STATUS]
+export type ProductSortOrder = (typeof PRODUCT_SORT_ORDER)[keyof typeof PRODUCT_SORT_ORDER]
+export type SpriteAccountClearScope =
+  (typeof SPRITE_ACCOUNT_CLEAR_SCOPE)[keyof typeof SPRITE_ACCOUNT_CLEAR_SCOPE]
+export type SqliteBoolean = (typeof SQLITE_BOOLEAN)[keyof typeof SQLITE_BOOLEAN]
 
 export interface ParsedPrice {
-  currency: string
+  currency: Currency
   amount: number
 }
 
@@ -16,7 +30,7 @@ export interface ProductQueryFilter {
   limit?: number
   offset?: number
   sortBy?: string
-  sortOrder?: 'ASC' | 'DESC'
+  sortOrder?: ProductSortOrder
   hasSellerSpriteData?: boolean
 }
 
@@ -71,7 +85,7 @@ export interface CrawledProductRow {
   seller_type?: string | null
   sellersprite_units?: number | null
   sellersprite_available?: number | null
-  has_sellersprite_data: 0 | 1
+  has_sellersprite_data: SqliteBoolean
   crawled_at: string
 }
 
@@ -81,7 +95,7 @@ export interface ProductBsrRankRow {
   task_id: number
   asin: string
   rank: number
-  is_main: 0 | 1
+  is_main: SqliteBoolean
   bsr_id: string
   label: string
   text: string

@@ -2,11 +2,12 @@ import { shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../../resources/icon.png?asset'
+import { MAIN_WINDOW_SIZE } from '../config/app'
 
 export function createMainWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: MAIN_WINDOW_SIZE.WIDTH,
+    height: MAIN_WINDOW_SIZE.HEIGHT,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),

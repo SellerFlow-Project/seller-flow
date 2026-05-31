@@ -30,6 +30,7 @@ export const AmazonCollection: React.FC = () => {
   const [marketplace, setMarketplace] = useState<AmazonMarketplace>(AmazonMarketplace.JP)
   const [crawlStrategy, setCrawlStrategy] = useState<'strategy1' | 'strategy2'>('strategy1')
   const [isCrawling, setIsCrawling] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const [logs, setLogs] = useState<string[]>([
     '系统就绪，等待用户启动采集任务。'
   ])
@@ -198,6 +199,7 @@ export const AmazonCollection: React.FC = () => {
       if (state.completedPrimaries) setCompletedPrimaries(state.completedPrimaries)
       if (state.activePath) setActivePath(state.activePath)
       if (typeof state.isCrawling === 'boolean') setIsCrawling(state.isCrawling)
+      if (typeof state.runState === 'string') setIsStopping(state.runState === 'stopping')
     }
 
     // 监听主进程的流式通信消息与拓扑状态广播
@@ -209,15 +211,19 @@ export const AmazonCollection: React.FC = () => {
       try {
         const status = await window.electron.ipcRenderer.invoke('crawler:get-status')
         if (status.success) {
-          if (status.isRunning) {
-            setIsCrawling(true)
+          setIsCrawling(status.isRunning === true)
+          setIsStopping(status.isStopping === true)
+          if (status.isRunning && status.config) {
             setTaskType(status.config.taskType as CrawlTaskType)
             setMarketplace(status.config.marketplace as AmazonMarketplace)
             if (status.config.crawlStrategy) {
               setCrawlStrategy(status.config.crawlStrategy as 'strategy1' | 'strategy2')
             }
             setLogs((prev) => {
-              const next = [...prev, '[系统] 检测到后台正在运行采集任务，状态已无缝续接。']
+              const message = status.isStopping
+                ? '[系统] 检测到后台任务正在停止，状态已无缝续接。'
+                : '[系统] 检测到后台正在运行采集任务，状态已无缝续接。'
+              const next = [...prev, message]
               return next.length > 300 ? next.slice(next.length - 300) : next
             })
           }
@@ -281,6 +287,21 @@ export const AmazonCollection: React.FC = () => {
   /**
    * 确认并正式启动后台异步 DFS 深度采集任务
    */
+  const syncCrawlerStatus = async () => {
+    try {
+      const status = await window.electron.ipcRenderer.invoke('crawler:get-status')
+      if (!status.success) return
+
+      setIsCrawling(status.isRunning === true)
+      setIsStopping(status.isStopping === true)
+      if (status.firstLevelCats) setFirstLevelCats(status.firstLevelCats)
+      if (status.completedPrimaries) setCompletedPrimaries(status.completedPrimaries)
+      if (status.activePath) setActivePath(status.activePath)
+    } catch (err) {
+      console.error('[AmazonCollection] 同步后台爬虫状态失败:', err)
+    }
+  }
+
   const confirmAndStartCrawl = async () => {
     const selectedCategories = tempCategories
       .filter((c) => c.enabled)
@@ -293,6 +314,7 @@ export const AmazonCollection: React.FC = () => {
 
     setShowAdjustModal(false)
     setIsCrawling(true)
+    setIsStopping(false)
     setLogs(['[系统] 正在向主进程引擎发起排行榜深度 DFS 采集指令...'])
 
     // 重置实时拓扑状态
@@ -319,7 +341,7 @@ export const AmazonCollection: React.FC = () => {
           const next = [...prev, `[错误] 异步采集启动失败: ${res.error || '未知响应'}`]
           return next.length > 300 ? next.slice(next.length - 300) : next
         })
-        setIsCrawling(false)
+        await syncCrawlerStatus()
       } else {
         setLogs((prev) => {
           const next = [...prev, '[系统] 后台异步采集引擎启动就绪，正在初始化通信，请稍候...']
@@ -331,7 +353,7 @@ export const AmazonCollection: React.FC = () => {
         const next = [...prev, `[错误] 与主进程 IPC 消息通信异常: ${err.message}`]
         return next.length > 300 ? next.slice(next.length - 300) : next
       })
-      setIsCrawling(false)
+      await syncCrawlerStatus()
     }
   }
 
@@ -398,7 +420,16 @@ export const AmazonCollection: React.FC = () => {
     try {
       const res = await window.electron.ipcRenderer.invoke('crawler:stop-task')
       if (res.success) {
-        setIsCrawling(false)
+        await syncCrawlerStatus()
+        setLogs((prev) => {
+          const message = res.accepted
+            ? '[系统] 主进程已受理停止请求，正在等待当前网络请求退出并清理状态...'
+            : res.runState === 'stopping'
+            ? '[系统] 任务已处于停止处理中，请稍候...'
+            : '[系统] 当前没有正在运行的采集任务。'
+          const next = [...prev, message]
+          return next.length > 300 ? next.slice(next.length - 300) : next
+        })
       }
     } catch (err: any) {
       setLogs((prev) => {
@@ -642,10 +673,15 @@ export const AmazonCollection: React.FC = () => {
                 ) : (
                   <button
                     onClick={stopCrawl}
-                    className="w-full inline-flex items-center justify-center space-x-2 bg-destructive text-destructive-foreground font-medium py-2 rounded-md hover:bg-destructive/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0"
+                    disabled={isStopping}
+                    className="w-full inline-flex items-center justify-center space-x-2 bg-destructive text-destructive-foreground font-medium py-2 rounded-md hover:bg-destructive/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Square className="w-4 h-4" />
-                    <span>停止任务</span>
+                    {isStopping ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                    <span>{isStopping ? '正在停止...' : '停止任务'}</span>
                   </button>
                 )}
               </div>
@@ -877,7 +913,9 @@ export const AmazonCollection: React.FC = () => {
             <div>
               <h3 className="font-semibold text-sm">实时采集拓扑图 (Crawl Topology)</h3>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                {isCrawling
+                {isStopping
+                  ? `正在停止任务 | 等待当前请求退出 | 当前路径深度: ${activePath.length} 层`
+                  : isCrawling
                   ? `DFS 深度递归挖掘中 | 当前路径深度: ${activePath.length} 层`
                   : '后台处于就绪状态，等待任务开启'}
               </p>
@@ -885,7 +923,12 @@ export const AmazonCollection: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-3" onClick={(e) => e.stopPropagation()}>
-            {isCrawling ? (
+            {isStopping ? (
+              <div className="flex items-center space-x-1.5 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-amber-500/20 animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                <span>停止中 (STOPPING)</span>
+              </div>
+            ) : isCrawling ? (
               <div className="flex items-center space-x-1.5 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-blue-500/20 animate-pulse">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
                 <span>采集中 (DFS ACTIVE)</span>
