@@ -4,10 +4,9 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
-- Applied saved crawling delay and concurrency settings to live crawler requests and detail batches.
+- Applied saved crawling delay and concurrency settings to Amazon requests and detail batches.
+- Added interruptible five-minute cooldown retries for Amazon detail-request risk-control failures.
 
 ## [0.1.0] - 2026-06-01
 
-- Added GitHub Releases based online updates for the Windows desktop application.
-- Added startup update checks, manual update checks, in-app download progress, and restart-to-install support.
-- Added electron-store based local persistence for application, crawling, notification, and AI settings.
+- 第一个测试版本

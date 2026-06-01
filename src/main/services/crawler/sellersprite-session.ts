@@ -15,7 +15,6 @@ import { sleep } from '../../utils/time'
 import { databaseService } from '../database.service'
 import { sellerSpriteService } from '../sellersprite.service'
 import { SellerSpriteAuthenticationError, SellerSpriteRetryExhaustedError } from './errors'
-import { sleepForCrawlerRequestDelay } from './runtime-settings'
 
 export class SellerSpriteSessionService {
   public async fetchQuickViewWithRetry(
@@ -27,7 +26,6 @@ export class SellerSpriteSessionService {
     let attempt = SELLERSPRITE_INITIAL_ATTEMPT
 
     while (attempt <= SELLERSPRITE_QUICK_VIEW_MAX_ATTEMPTS) {
-      await sleepForCrawlerRequestDelay(signal)
       const result = await sellerSpriteService.getQuickViewJP(asins, token, signal)
 
       if (result.status === SELLERSPRITE_QUICK_VIEW_STATUS.NETWORK_ERROR) {
@@ -94,7 +92,6 @@ export class SellerSpriteSessionService {
 
       let attempt = SELLERSPRITE_INITIAL_ATTEMPT
       while (attempt <= SELLERSPRITE_LOGIN_MAX_ATTEMPTS) {
-        await sleepForCrawlerRequestDelay(signal)
         const result = await sellerSpriteService.login(account.username, account.password, signal)
 
         if (result.status === SELLERSPRITE_LOGIN_STATUS.SUCCESS) {

@@ -19,11 +19,13 @@ export const CRAWLER_HTML_SNIPPET_SUFFIX = '\n... [HTML 数据流已截止] ...'
 export const CRAWLER_MAX_CONSECUTIVE_EMPTY_PRODUCT_PAGES = 10
 export const DELIVERY_DETAIL_BATCH_SIZE = 100
 export const DELIVERY_DETAIL_POLL_INTERVAL_MS = 1000
+export const DELIVERY_DETAIL_RISK_CONTROL_COOLDOWN_MS = 5 * 60 * 1000
 
 export const DELIVERY_DETAIL_PHASE = {
   IDLE: 'idle',
   WAITING: 'waiting',
   RUNNING: 'running',
+  RISK_CONTROL_COOLDOWN: 'risk_control_cooldown',
   STOPPING: 'stopping',
   FAILED: 'failed',
   COMPLETED: 'completed'

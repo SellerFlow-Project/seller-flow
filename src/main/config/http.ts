@@ -13,7 +13,7 @@ export const HTTP_HEADER = {
   USER_AGENT: 'User-Agent'
 } as const
 
-export const HTTP_RETRY_STATUS = new Set([429, 503, 403])
+export const HTTP_RETRY_STATUS = new Set([429, 503, 403, 500])
 
 export const HTTP_RETRY_POLICY = {
   MAX_ATTEMPTS: 3,

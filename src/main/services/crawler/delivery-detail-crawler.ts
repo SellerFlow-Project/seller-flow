@@ -3,7 +3,8 @@ import {
   DELIVERY_DETAIL_BATCH_SIZE,
   DELIVERY_DETAIL_ITEM_STATUS,
   DELIVERY_DETAIL_PHASE,
-  DELIVERY_DETAIL_POLL_INTERVAL_MS
+  DELIVERY_DETAIL_POLL_INTERVAL_MS,
+  DELIVERY_DETAIL_RISK_CONTROL_COOLDOWN_MS
 } from '../../config/crawler'
 import type { AmazonMarketplace } from '../../types/amazon'
 import type {
@@ -141,7 +142,13 @@ export class AmazonDeliveryDetailCrawler {
         continue
       }
 
-      await this.processBatch(batch, marketplace, cookies, deferredProductIds, onProgress, signal)
+      try {
+        await this.processBatch(batch, marketplace, cookies, deferredProductIds, onProgress, signal)
+      } catch (error) {
+        if (!(error instanceof AmazonRiskControlError)) throw error
+
+        await this.waitForRiskControlCooldown(error, onProgress, signal)
+      }
     }
   }
 
@@ -232,7 +239,7 @@ export class AmazonDeliveryDetailCrawler {
         error: message
       })
       if (error instanceof AmazonRiskControlError) {
-        onProgress(`[风控] 商品 ${product.asin} 详情请求被亚马逊限制，停止详情并发采集: ${message}`)
+        onProgress(`[风控] 商品 ${product.asin} 详情请求被亚马逊限制: ${message}`)
         throw error
       }
 
@@ -250,15 +257,31 @@ export class AmazonDeliveryDetailCrawler {
       let nextIndex = 0
       let activeCount = 0
       let settled = false
+      let firstError: unknown
+      let hasError = false
 
       const finish = (): void => {
         this.concurrencyChangeHandlers.delete(schedule)
       }
 
+      const settleIfComplete = (): void => {
+        if (activeCount > 0) return
+
+        if (hasError) {
+          settled = true
+          finish()
+          reject(firstError)
+        } else if (nextIndex >= items.length) {
+          settled = true
+          finish()
+          resolve(results)
+        }
+      }
+
       const schedule = (): void => {
         if (settled) return
 
-        while (activeCount < this.state.concurrency && nextIndex < items.length) {
+        while (!hasError && activeCount < this.state.concurrency && nextIndex < items.length) {
           const currentIndex = nextIndex++
           activeCount++
 
@@ -269,23 +292,40 @@ export class AmazonDeliveryDetailCrawler {
               schedule()
             },
             (error: unknown) => {
-              settled = true
-              finish()
-              reject(error)
+              activeCount--
+              if (!hasError) {
+                hasError = true
+                firstError = error
+              }
+              schedule()
             }
           )
         }
 
-        if (nextIndex >= items.length && activeCount === 0) {
-          settled = true
-          finish()
-          resolve(results)
-        }
+        settleIfComplete()
       }
 
       this.concurrencyChangeHandlers.add(schedule)
       schedule()
     })
+  }
+
+  private async waitForRiskControlCooldown(
+    error: AmazonRiskControlError,
+    onProgress: CrawlerProgressHandler,
+    signal?: AbortSignal
+  ): Promise<void> {
+    this.state.phase = DELIVERY_DETAIL_PHASE.RISK_CONTROL_COOLDOWN
+    this.state.lastError = getErrorMessage(error)
+    this.notifyStateChange()
+    onProgress('[风控] 商品详情并发采集暂停，等待 5 分钟后自动继续。')
+
+    await sleep(DELIVERY_DETAIL_RISK_CONTROL_COOLDOWN_MS, signal)
+    throwIfAborted(signal)
+
+    this.state.lastError = undefined
+    this.setPhase(DELIVERY_DETAIL_PHASE.WAITING)
+    onProgress('[详情] 商品详情风控冷却结束，重新尝试采集待处理商品。')
   }
 
   private updateQueueItem(productId: number, patch: Partial<DeliveryDetailQueueItem>): void {

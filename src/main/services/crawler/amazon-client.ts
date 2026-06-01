@@ -214,10 +214,10 @@ export class AmazonClient {
         // 用户主动中止，立即抛出
         if (isAbortError(error as Error)) throw error
 
-        const isRiskControl =
-          error instanceof AmazonRiskControlError || isRiskControlHttpError(error)
+        // const isRiskControl =
+        //   error instanceof AmazonRiskControlError || isRiskControlHttpError(error)
 
-        if (!isRiskControl) throw error
+        // if (!isRiskControl) throw error
 
         lastError = error as Error
 

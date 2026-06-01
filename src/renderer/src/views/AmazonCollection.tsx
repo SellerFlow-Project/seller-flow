@@ -36,7 +36,14 @@ interface DeliveryDetailQueueItem {
 }
 
 interface DeliveryDetailState {
-  phase: 'idle' | 'waiting' | 'running' | 'stopping' | 'failed' | 'completed'
+  phase:
+    | 'idle'
+    | 'waiting'
+    | 'running'
+    | 'risk_control_cooldown'
+    | 'stopping'
+    | 'failed'
+    | 'completed'
   batchSize: number
   concurrency: number
   batchNumber: number
@@ -425,6 +432,8 @@ export const AmazonCollection: React.FC = () => {
       ? `第 ${deliveryDetail.batchNumber} 批执行中`
       : deliveryDetail.phase === 'waiting'
         ? `等待满批 (${deliveryDetail.waitingProductCount}/${deliveryDetail.batchSize})`
+        : deliveryDetail.phase === 'risk_control_cooldown'
+          ? '触发风控，冷却 5 分钟后自动重试'
         : deliveryDetail.phase === 'stopping'
           ? '正在停止'
           : deliveryDetail.phase === 'failed'

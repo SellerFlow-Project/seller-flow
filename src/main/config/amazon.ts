@@ -32,7 +32,7 @@ export const AMAZON_BEST_SELLERS_CONTENT_MARKERS = [
 ] as const
 export const AMAZON_RISK_CONTROL_HTTP_STATUS = new Set([403, 429, 503])
 export const AMAZON_RISK_CONTROL_HTML_MARKERS = [
-  // 'api-services-support@amazon.com',
+  'api-services-support@amazon.com',
   'to discuss automated access to amazon data please contact',
   'enter the characters you see below',
   'type the characters you see in this image',
