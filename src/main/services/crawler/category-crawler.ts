@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio'
-import { AMAZON_CRAWL_DELAY_MS, AMAZON_MAX_DFS_DEPTH } from '../../config/amazon'
+import { AMAZON_MAX_DFS_DEPTH } from '../../config/amazon'
 import {
   CRAWLER_CATEGORY_PATH_SEPARATOR,
   CRAWLER_DEPTH_STEP,
@@ -13,7 +13,6 @@ import type { AmazonCategory } from '../../types/amazon'
 import type { CrawlerProgressHandler, DfsPathNode } from '../../types/crawler'
 import type { SellerSpriteQuickViewResponse } from '../../types/sellersprite'
 import { createAbortError, getErrorMessage, isAbortError, throwIfAborted } from '../../utils/error'
-import { sleep } from '../../utils/time'
 import { databaseService } from '../database.service'
 import { amazonClient } from './amazon-client'
 import {
@@ -85,10 +84,6 @@ export class AmazonCategoryCrawler {
         signal
       )
       this.throwIfCancelled(signal)
-      if (subCategories.length > 0) {
-        await sleep(AMAZON_CRAWL_DELAY_MS, signal)
-      }
-
       for (const subCategory of subCategories) {
         this.throwIfCancelled(signal)
         if (currentDepth < AMAZON_MAX_DFS_DEPTH) {
@@ -167,10 +162,6 @@ export class AmazonCategoryCrawler {
           `[错误] ${indent}  ❌ Page ${page} 抓取失败，任务已熔断: ${getErrorMessage(error)}`
         )
         throw error
-      }
-
-      if (hasMore) {
-        await sleep(AMAZON_CRAWL_DELAY_MS, signal)
       }
     }
   }

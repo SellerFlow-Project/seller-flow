@@ -50,7 +50,7 @@ interface DeliveryDetailState {
 const EMPTY_DELIVERY_DETAIL_STATE: DeliveryDetailState = {
   phase: 'idle',
   batchSize: DELIVERY_DETAIL_BATCH_SIZE,
-  concurrency: 5,
+  concurrency: 1,
   batchNumber: 0,
   totalSucceeded: 0,
   totalFailed: 0,

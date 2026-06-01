@@ -22,6 +22,7 @@ import type {
   CrawlTaskConfig,
   DfsState
 } from '../types/crawler'
+import type { CrawlingSettings } from '../../shared/settings'
 import { getErrorMessage, isAbortError } from '../utils/error'
 import { createCompactTimestamp } from '../utils/time'
 import { logAndSendCrawlerLog, sendToFirstWindow } from '../utils/window-bus'
@@ -33,6 +34,7 @@ import {
 import { AmazonCategoryCrawler } from './crawler/category-crawler'
 import { AmazonDeliveryDetailCrawler } from './crawler/delivery-detail-crawler'
 import { databaseService } from './database.service'
+import { getCrawlingSettings } from './settings.service'
 
 export { parseAmazonBestSellerHtml } from './crawler/amazon-parser'
 
@@ -103,6 +105,7 @@ class CrawlerService {
   }
 
   public getDfsState(): DfsState {
+    this.deliveryDetailCrawler.syncRuntimeSettings(getCrawlingSettings())
     return {
       firstLevelCats: this.firstLevelCatsList,
       completedPrimaries: Array.from(this.completedPrimaries),
@@ -194,6 +197,10 @@ class CrawlerService {
       taskId: this.activeTaskId,
       config: this.activeTask
     }
+  }
+
+  public applyCrawlingSettings(settings: CrawlingSettings): void {
+    this.deliveryDetailCrawler.applyRuntimeSettings(settings)
   }
 
   private async runTask(
@@ -313,6 +320,7 @@ class CrawlerService {
     this.firstLevelCatsList = []
     this.completedPrimaries.clear()
     this.categoryCrawler.reset()
+    this.deliveryDetailCrawler.syncRuntimeSettings(getCrawlingSettings())
     this.deliveryDetailCrawler.reset()
   }
 

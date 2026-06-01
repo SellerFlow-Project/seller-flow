@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer, webFrame } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import {
+  isApplicationSettings,
+  isSellerFlowSettings,
+  type ApplicationSettings,
+  type SellerFlowSettings,
+  type SettingsApi
+} from '../shared/settings'
 import type { AppUpdateApi, AppUpdateState } from '../shared/update'
 
 // Custom APIs for renderer
@@ -18,7 +25,52 @@ const updates: AppUpdateApi = {
   }
 }
 
+function getIpcErrorMessage(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || !('success' in value)) {
+    return undefined
+  }
+
+  const response = value as { success?: boolean; error?: unknown; message?: unknown }
+  if (response.success !== false) {
+    return undefined
+  }
+
+  return typeof response.error === 'string'
+    ? response.error
+    : typeof response.message === 'string'
+      ? response.message
+      : '主进程未能完成配置操作。'
+}
+
+async function invokeSettings<T>(
+  channel: string,
+  args: unknown[],
+  validator: (value: unknown) => value is T
+): Promise<T> {
+  const response: unknown = await ipcRenderer.invoke(channel, ...args)
+  const errorMessage = getIpcErrorMessage(response)
+
+  if (errorMessage) {
+    throw new Error(errorMessage)
+  }
+
+  if (!validator(response)) {
+    throw new Error('主进程返回了不完整的配置数据。')
+  }
+
+  return response
+}
+
+const settings: SettingsApi = {
+  get: (): Promise<SellerFlowSettings> => invokeSettings('settings:get', [], isSellerFlowSettings),
+  save: (nextSettings): Promise<SellerFlowSettings> =>
+    invokeSettings('settings:save', [nextSettings], isSellerFlowSettings),
+  updateApplication: (nextSettings): Promise<ApplicationSettings> =>
+    invokeSettings('settings:update-application', [nextSettings], isApplicationSettings)
+}
+
 const api = {
+  settings,
   updates
 }
 

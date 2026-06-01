@@ -29,6 +29,7 @@ import { fetchResponse, fetchText, HttpStatusError, rotateUserAgent } from '../.
 import { sleep } from '../../utils/time'
 import { parseBestsellerCategories } from './amazon-parser'
 import { AmazonRiskControlError } from './errors'
+import { sleepForCrawlerRequestDelay } from './runtime-settings'
 
 const SOURCE_CSRF_TOKEN_RE = /&quot;anti-csrftoken-a2z&quot;:&quot;(.*?)&quot;/
 const ADDRESS_SELECTION_CSRF_TOKEN_RE = /CSRF_TOKEN\s*:\s*"([^"]+)"/
@@ -119,6 +120,7 @@ export class AmazonClient {
     onLog(`[系统] 正在进行 ${marketplace} 站点配送地址安全 Cookie 动态握手交换...`)
 
     try {
+      await sleepForCrawlerRequestDelay(signal)
       const sessionResponse = await fetchResponse(
         cookieProbeUrl,
         { headers: createCookieProbeHeaders(), signal },
@@ -135,6 +137,7 @@ export class AmazonClient {
         sourceCsrfToken,
         signal
       )
+      await sleepForCrawlerRequestDelay(signal)
       const addressResponse = await fetchResponse(
         createAmazonUrl(domain, AMAZON_PATH.ADDRESS_CHANGE),
         {
@@ -199,6 +202,7 @@ export class AmazonClient {
 
     for (let attempt = 1; attempt <= AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS; attempt++) {
       try {
+        await sleepForCrawlerRequestDelay(signal)
         const html = await fetchText(
           url,
           { headers: createAmazonHtmlHeaders(cookies), signal },
@@ -272,6 +276,7 @@ export class AmazonClient {
     signal?: AbortSignal
   ): Promise<string> {
     try {
+      await sleepForCrawlerRequestDelay(signal)
       const html = await fetchText(createAmazonUrl(domain, AMAZON_PATH.ADDRESS_SELECTIONS), {
         headers: createAddressSelectionHeaders(referer, cookies, sourceCsrfToken),
         signal

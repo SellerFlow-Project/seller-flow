@@ -10,8 +10,6 @@ export const AMAZON_MARKETPLACE = {
 
 export const DEFAULT_AMAZON_MARKETPLACE: AmazonMarketplace = AMAZON_MARKETPLACE.JP
 
-export const AMAZON_CRAWL_DELAY_MS = 1500
-export const AMAZON_DELIVERY_DETAIL_DELAY_MS = 1200
 export const AMAZON_MAX_DFS_DEPTH = 10
 export const AMAZON_ASIN_LENGTH = 10
 export const AMAZON_SESSION_COOKIE_NAME = 'session-id'

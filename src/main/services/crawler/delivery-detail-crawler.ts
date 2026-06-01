@@ -1,11 +1,6 @@
-import {
-  AMAZON_DELIVERY_DETAIL_DELAY_MS,
-  createAmazonProductDetailUrl,
-  resolveAmazonMarketplace
-} from '../../config/amazon'
+import { createAmazonProductDetailUrl, resolveAmazonMarketplace } from '../../config/amazon'
 import {
   DELIVERY_DETAIL_BATCH_SIZE,
-  DELIVERY_DETAIL_CONCURRENCY,
   DELIVERY_DETAIL_ITEM_STATUS,
   DELIVERY_DETAIL_PHASE,
   DELIVERY_DETAIL_POLL_INTERVAL_MS
@@ -20,6 +15,7 @@ import type {
   PendingDeliveryDetailProduct,
   ProductDeliveryDetailUpdate
 } from '../../types/database'
+import type { CrawlingSettings } from '../../../shared/settings'
 import { getErrorMessage, isAbortError, throwIfAborted } from '../../utils/error'
 import { sleep } from '../../utils/time'
 import { databaseService } from '../database.service'
@@ -43,11 +39,11 @@ interface DeliveryDetailResult {
 
 type StateChangeHandler = (state: DeliveryDetailState) => void
 
-function createInitialState(): DeliveryDetailState {
+function createInitialState(concurrency: number): DeliveryDetailState {
   return {
     phase: DELIVERY_DETAIL_PHASE.IDLE,
     batchSize: DELIVERY_DETAIL_BATCH_SIZE,
-    concurrency: DELIVERY_DETAIL_CONCURRENCY,
+    concurrency,
     batchNumber: 0,
     totalSucceeded: 0,
     totalFailed: 0,
@@ -57,7 +53,8 @@ function createInitialState(): DeliveryDetailState {
 }
 
 export class AmazonDeliveryDetailCrawler {
-  private state = createInitialState()
+  private state = createInitialState(1)
+  private readonly concurrencyChangeHandlers = new Set<() => void>()
 
   public constructor(private readonly onStateChange: StateChangeHandler) {}
 
@@ -69,7 +66,24 @@ export class AmazonDeliveryDetailCrawler {
   }
 
   public reset(): void {
-    this.state = createInitialState()
+    this.state = createInitialState(this.state.concurrency)
+    this.notifyStateChange()
+  }
+
+  public syncRuntimeSettings(settings: CrawlingSettings): boolean {
+    const concurrency = Math.max(1, Math.floor(settings.concurrencyCount))
+    if (this.state.concurrency === concurrency) return false
+
+    this.state.concurrency = concurrency
+    return true
+  }
+
+  public applyRuntimeSettings(settings: CrawlingSettings): void {
+    if (!this.syncRuntimeSettings(settings)) return
+
+    for (const handleConcurrencyChange of this.concurrencyChangeHandlers) {
+      handleConcurrencyChange()
+    }
     this.notifyStateChange()
   }
 
@@ -100,7 +114,7 @@ export class AmazonDeliveryDetailCrawler {
     const deferredProductIds = new Set<number>()
     this.setPhase(DELIVERY_DETAIL_PHASE.WAITING)
     onProgress(
-      `[详情] 配送天数采集器已启动：每批 ${DELIVERY_DETAIL_BATCH_SIZE} 个商品，并发数 ${DELIVERY_DETAIL_CONCURRENCY}。`
+      `[详情] 配送天数采集器已启动：每批 ${DELIVERY_DETAIL_BATCH_SIZE} 个商品，并发数 ${this.state.concurrency}。`
     )
 
     while (true) {
@@ -161,7 +175,6 @@ export class AmazonDeliveryDetailCrawler {
         onProgress,
         signal
       )
-      await sleep(AMAZON_DELIVERY_DETAIL_DELAY_MS, signal)
       return result
     })
     throwIfAborted(signal)
@@ -232,20 +245,47 @@ export class AmazonDeliveryDetailCrawler {
     items: TItem[],
     handler: (item: TItem) => Promise<TResult>
   ): Promise<TResult[]> {
-    const results = new Array<TResult>(items.length)
-    let nextIndex = 0
-    const workers = Array.from(
-      { length: Math.min(DELIVERY_DETAIL_CONCURRENCY, items.length) },
-      async () => {
-        while (nextIndex < items.length) {
+    return await new Promise<TResult[]>((resolve, reject) => {
+      const results = new Array<TResult>(items.length)
+      let nextIndex = 0
+      let activeCount = 0
+      let settled = false
+
+      const finish = (): void => {
+        this.concurrencyChangeHandlers.delete(schedule)
+      }
+
+      const schedule = (): void => {
+        if (settled) return
+
+        while (activeCount < this.state.concurrency && nextIndex < items.length) {
           const currentIndex = nextIndex++
-          results[currentIndex] = await handler(items[currentIndex])
+          activeCount++
+
+          void handler(items[currentIndex]).then(
+            (result) => {
+              results[currentIndex] = result
+              activeCount--
+              schedule()
+            },
+            (error: unknown) => {
+              settled = true
+              finish()
+              reject(error)
+            }
+          )
+        }
+
+        if (nextIndex >= items.length && activeCount === 0) {
+          settled = true
+          finish()
+          resolve(results)
         }
       }
-    )
 
-    await Promise.all(workers)
-    return results
+      this.concurrencyChangeHandlers.add(schedule)
+      schedule()
+    })
   }
 
   private updateQueueItem(productId: number, patch: Partial<DeliveryDetailQueueItem>): void {

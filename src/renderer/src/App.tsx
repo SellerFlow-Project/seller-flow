@@ -9,14 +9,25 @@ import { useAppStore } from './store/appStore'
 import { useScreenAdaptation } from './hooks/useScreenAdaptation'
 
 function App(): React.JSX.Element {
-  const { activeTab, expandedMenus, theme, setTab, toggleMenu, toggleTheme } = useAppStore()
+  const {
+    activeTab,
+    expandedMenus,
+    theme,
+    setTab,
+    toggleMenu,
+    toggleTheme,
+    applyApplicationSettings
+  } = useAppStore()
   const breadcrumbs = useMemo(() => getBreadcrumbs(activeTab), [activeTab])
 
   useScreenAdaptation()
 
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', theme === 'dark')
-  }, [theme])
+    void window.api.settings
+      .get()
+      .then((settings) => applyApplicationSettings(settings.application))
+      .catch((error) => console.error('[Settings] 加载应用程序设置失败：', error))
+  }, [applyApplicationSettings])
 
   return (
     <div className="flex w-screen h-screen bg-slate-50 dark:bg-black overflow-hidden font-sans select-none">

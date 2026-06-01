@@ -29,6 +29,11 @@ export const IPC_CHANNEL = {
     LOGIN: 'sellersprite:login',
     GET_QUICK_VIEW: 'sellersprite:get-quick-view'
   },
+  SETTINGS: {
+    GET: 'settings:get',
+    SAVE: 'settings:save',
+    UPDATE_APPLICATION: 'settings:update-application'
+  },
   UPDATE: {
     GET_STATE: 'update:get-state',
     CHECK: 'update:check',
