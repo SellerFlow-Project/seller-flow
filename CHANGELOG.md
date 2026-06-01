@@ -4,8 +4,9 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
-- Applied saved crawling delay and concurrency settings to Amazon requests and detail batches.
-- Added interruptible five-minute cooldown retries for Amazon detail-request risk-control failures.
+## [0.1.1] - 2026-06-01
+
+- 优化爬取逻辑，减小被风控的风险，以及风控后自动冷却任务等待几分钟后自动继续
 
 ## [0.1.0] - 2026-06-01
 
