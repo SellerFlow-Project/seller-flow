@@ -28,10 +28,17 @@ export const IPC_CHANNEL = {
     CALCULATE_BUSINESS_TK: 'sellersprite:calculate-business-tk',
     LOGIN: 'sellersprite:login',
     GET_QUICK_VIEW: 'sellersprite:get-quick-view'
+  },
+  UPDATE: {
+    GET_STATE: 'update:get-state',
+    CHECK: 'update:check',
+    DOWNLOAD: 'update:download',
+    QUIT_AND_INSTALL: 'update:quit-and-install'
   }
 } as const
 
 export const WINDOW_CHANNEL = {
   CRAWLER_LOG_PROGRESS: 'crawler:log-progress',
-  CRAWLER_STATE_UPDATE: 'crawler:state-update'
+  CRAWLER_STATE_UPDATE: 'crawler:state-update',
+  UPDATE_STATE: 'update:state'
 } as const

@@ -2,9 +2,12 @@ name: Build Windows App
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-windows:
@@ -25,13 +28,75 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          $expectedTag = "v$packageVersion"
+          if ("${{ github.ref_name }}" -ne $expectedTag) {
+            throw "Tag ${{ github.ref_name }} does not match package.json version $packageVersion. Expected $expectedTag."
+          }
+
       - name: Build Windows app
         run: npm run build:win
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
-      - name: Upload Windows installer
+      - name: Prepare curated release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: node scripts/extract-release-notes.mjs "${{ github.ref_name }}" release-notes.md
+
+      - name: Upload Windows build artifact
         uses: actions/upload-artifact@v7
         with:
-          name: seller-flow-windows-${{ github.sha }}
-          path: dist/*.exe
+          name: seller-flow-windows-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $repo = "${{ github.repository }}"
+          $assets = @(
+            Get-ChildItem -Path dist -File |
+              Where-Object { $_.Name -eq "latest.yml" -or $_.Extension -eq ".exe" -or $_.Extension -eq ".blockmap" } |
+              ForEach-Object { $_.FullName }
+          )
+
+          if ($assets.Count -eq 0) {
+            throw "No release assets were produced."
+          }
+
+          gh release view $tag --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag @assets --clobber --repo $repo
+          } else {
+            $arguments = @(
+              "release", "create", $tag
+              "--verify-tag"
+              "--generate-notes"
+              "--title", "SellerFlow $tag"
+              "--repo", $repo
+            )
+
+            if (Test-Path "release-notes.md") {
+              $arguments += @("--notes-file", "release-notes.md")
+            }
+
+            $arguments += $assets
+            gh @arguments
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to publish GitHub Release assets."
+          }

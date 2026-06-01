@@ -1,6 +1,6 @@
 {
   "name": "seller-flow",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "SellerFlow",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -16,7 +16,7 @@
     "build": "npm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
-    "build:win": "npm run build && electron-builder --win",
+    "build:win": "npm run build && electron-builder --win --x64 --publish never",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux"
   },
@@ -27,6 +27,7 @@
     "cheerio": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.3",
     "lucide-react": "^1.17.0",
     "moment": "^2.30.1",
     "tailwind-merge": "^3.6.0",

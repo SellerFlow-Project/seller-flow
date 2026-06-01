@@ -3,6 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { APP_NAME, APP_USER_MODEL_ID } from './config/app'
 import { IPC_CHANNEL } from './config/ipc'
 import { registerAllIPC } from './ipc'
+import { initializeAutoUpdater } from './services/update.service'
 import { createMainWindow } from './window/main-window'
 
 function registerAppLifecycle(): void {
@@ -34,4 +35,5 @@ app.whenReady().then(() => {
   ipcMain.on(IPC_CHANNEL.PING, () => console.log('pong'))
 
   createMainWindow()
+  initializeAutoUpdater()
 })

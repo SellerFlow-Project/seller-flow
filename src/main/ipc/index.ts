@@ -1,6 +1,7 @@
 import { registerDatabaseIPC } from './database.ipc'
 import { registerCrawlerIPC } from './crawler.ipc'
 import { registerSellerSpriteIPC } from './sellersprite.ipc'
+import { registerUpdateIPC } from './update.ipc'
 
 /**
  * 集中注册主进程中所有的 IPC 管道监听
@@ -10,5 +11,6 @@ export function registerAllIPC(): void {
   registerDatabaseIPC()
   registerCrawlerIPC()
   registerSellerSpriteIPC()
-  console.log('[IPC] 数据库、爬虫与卖家精灵服务的所有 IPC 消息管道注册完毕。')
+  registerUpdateIPC()
+  console.log('[IPC] 数据库、爬虫、卖家精灵与更新服务的所有 IPC 消息管道注册完毕。')
 }

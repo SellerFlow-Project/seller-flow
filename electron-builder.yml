@@ -1,4 +1,4 @@
-appId: com.electron.app
+appId: sellerflow.app.desktop
 productName: SellerFlow
 directories:
   buildResources: build
@@ -39,5 +39,7 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: SellerFlow-Project
+  repo: seller-flow
+  releaseType: release

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Sun,
   Moon,
@@ -15,9 +15,12 @@ import {
   Trash2,
   Brain,
   Cpu,
-  Image as ImageIcon
+  Image as ImageIcon,
+  RefreshCw
 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import type { UiScaleMode } from '../store/appStore'
+import { useAppUpdater } from '../hooks/useAppUpdater'
 
 // Nested Toggle Switch Component for UI Consistency
 interface ToggleSwitchProps {
@@ -55,7 +58,8 @@ const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ checked, onChange, label, d
 }
 
 export const SettingsView: React.FC = () => {
-  const { theme, setTheme } = useAppStore()
+  const { theme, setTheme, uiScale, setUiScale } = useAppStore()
+  const { state: updateState, checkForUpdates } = useAppUpdater()
 
   // Setting sections tabs
   const [activeSection, setActiveSection] = useState<'app' | 'notifications' | 'crawling' | 'ai' | 'about'>('app')
@@ -88,10 +92,32 @@ export const SettingsView: React.FC = () => {
   const [imageApiKey, setImageApiKey] = useState('sk-••••••••••••••••')
 
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [updateMessage, setUpdateMessage] = useState('')
+
+  useEffect(() => {
+    if (updateState.status === 'checking') {
+      setUpdateMessage('正在检查更新...')
+    } else if (updateState.status === 'not-available') {
+      setUpdateMessage('当前已经是最新版本。')
+    } else if (updateState.status === 'available') {
+      setUpdateMessage(`发现新版本 v${updateState.updateInfo?.version || ''}，请在弹框中确认更新。`)
+    } else if (updateState.status === 'downloaded') {
+      setUpdateMessage('新版本已下载完成，等待重启安装。')
+    } else if (updateState.status === 'error') {
+      setUpdateMessage(`检查更新失败：${updateState.error || '请稍后重试。'}`)
+    }
+  }, [updateState])
 
   const handleSave = () => {
     setSaveSuccess(true)
     setTimeout(() => setSaveSuccess(false), 2500)
+  }
+
+  const handleCheckForUpdates = async () => {
+    const result = await checkForUpdates()
+    if (!result.success) {
+      setUpdateMessage(result.message || '检查更新失败，请稍后重试。')
+    }
   }
 
   // Swatch colors utility
@@ -258,6 +284,29 @@ export const SettingsView: React.FC = () => {
                       )}
                     )}
                   </div>
+                </div>
+
+                {/* UI Scale Config */}
+                <div className="space-y-2 pt-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">
+                    界面全局缩放 (UI Scale)
+                  </label>
+                  <p className="text-[11px] text-muted-foreground leading-normal mb-3">
+                    针对高分辨率显示器，自动计算或手动调节界面的缩放比例（原生无损缩放）：
+                  </p>
+                  <select
+                    value={uiScale}
+                    onChange={(e) => setUiScale(e.target.value as UiScaleMode)}
+                    className="w-full md:w-1/2 bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all cursor-pointer"
+                  >
+                    <option value="auto">自动适应显示器分辨率 (推荐)</option>
+                    <option value="0.8">80% - 紧凑</option>
+                    <option value="0.9">90% - 偏小</option>
+                    <option value="1.0">100% - 标准</option>
+                    <option value="1.1">110% - 偏大</option>
+                    <option value="1.2">120% - 较大</option>
+                    <option value="1.5">150% - 特大</option>
+                  </select>
                 </div>
               </div>
             )}
@@ -585,13 +634,35 @@ export const SettingsView: React.FC = () => {
                         SellerFlow Client 工作台
                       </h4>
                       <p className="text-[11px] text-primary font-mono mt-0.5">
-                        Version 1.2.8 (Build 260531) • 稳定生产版本
+                        Version {updateState.currentVersion} • 稳定生产版本
                       </p>
                     </div>
 
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       SellerFlow 是专门为跨境电商卖家定制的高速、多线程、多层级排行榜深度数据采集沙盒。底层搭载基于深度优先递归树爬网的多站点自适应抓取引擎，支持并轨实时卖家精灵指标数据回填，为您打通亚马逊排行榜选品最后一公里。
                     </p>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => void handleCheckForUpdates()}
+                        disabled={
+                          updateState.status === 'checking' ||
+                          updateState.status === 'downloading' ||
+                          updateState.status === 'downloaded'
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${updateState.status === 'checking' ? 'animate-spin' : ''}`}
+                        />
+                        检查更新
+                      </button>
+                      {updateMessage && (
+                        <span className="text-[11px] leading-relaxed text-muted-foreground">
+                          {updateMessage}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Module Badges */}
                     <div className="flex flex-wrap gap-2 pt-1.5">
