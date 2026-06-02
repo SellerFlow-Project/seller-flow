@@ -1,17 +1,17 @@
 import {
   DEFAULT_AMAZON_BASE_URL,
   DEFAULT_AMAZON_MARKETPLACE,
-  createAmazonBestSellersUrl,
+  createAmazonRankingUrl,
   resolveAmazonMarketplace
 } from '../config/amazon'
 import { CRAWLER_INITIAL_DEPTH, CRAWLER_RUN_STATE, CRAWL_TASK_TYPE } from '../config/crawler'
 import { CRAWL_TASK_STATUS, SELLERSPRITE_ACCOUNT_STATUS } from '../config/database'
 import { WINDOW_CHANNEL } from '../config/ipc'
 import type {
-  AmazonBestSellersPageResult,
   AmazonCategory,
   AmazonCookieResult,
-  AmazonMarketplaceConfig
+  AmazonMarketplaceConfig,
+  AmazonRankingPageResult
 } from '../types/amazon'
 import type {
   CrawlerProgressHandler,
@@ -23,20 +23,21 @@ import type {
   DfsState
 } from '../types/crawler'
 import type { CrawlingSettings } from '../../shared/settings'
+import { CRAWL_TASK_TYPE_NAMES, isCrawlTaskType, type CrawlTaskType } from '../../shared/crawler'
 import { getErrorMessage, isAbortError } from '../utils/error'
 import { createCompactTimestamp } from '../utils/time'
 import { logAndSendCrawlerLog, sendToFirstWindow } from '../utils/window-bus'
 import { amazonClient } from './crawler/amazon-client'
 import {
-  parseBestsellerCategories as parseAmazonBestsellerCategories,
-  parseBestsellerChildCategories as parseAmazonBestsellerChildCategories
+  parseAmazonRankingCategories,
+  parseAmazonRankingChildCategories
 } from './crawler/amazon-parser'
 import { AmazonCategoryCrawler } from './crawler/category-crawler'
 import { AmazonDeliveryDetailCrawler } from './crawler/delivery-detail-crawler'
 import { databaseService } from './database.service'
 import { getCrawlingSettings } from './settings.service'
 
-export { parseAmazonBestSellerHtml } from './crawler/amazon-parser'
+export { parseAmazonRankingHtml, parseAmazonBestSellerHtml } from './crawler/amazon-parser'
 
 /**
  * 亚马逊商品流核心任务编排服务 (Main 进程)
@@ -79,25 +80,23 @@ class CrawlerService {
     return await amazonClient.getCookies(marketplace, (log) => this.sendLog(log), signal)
   }
 
-  public parseBestsellerCategories(
-    html: string,
-    baseUrl = DEFAULT_AMAZON_BASE_URL
-  ): AmazonCategory[] {
-    return parseAmazonBestsellerCategories(html, baseUrl)
+  public parseRankingCategories(html: string, baseUrl = DEFAULT_AMAZON_BASE_URL): AmazonCategory[] {
+    return parseAmazonRankingCategories(html, baseUrl)
   }
 
-  public parseBestsellerChildCategories(
+  public parseRankingChildCategories(
     html: string,
     currentUrl = DEFAULT_AMAZON_BASE_URL
   ): AmazonCategory[] {
-    return parseAmazonBestsellerChildCategories(html, currentUrl)
+    return parseAmazonRankingChildCategories(html, currentUrl)
   }
 
-  public async fetchBestSellersPage(
+  public async fetchRankingPage(
     cookies: string,
-    marketplace: string = DEFAULT_AMAZON_MARKETPLACE
-  ): Promise<AmazonBestSellersPageResult> {
-    return await amazonClient.fetchBestSellersPage(cookies, marketplace)
+    marketplace: string = DEFAULT_AMAZON_MARKETPLACE,
+    taskType: CrawlTaskType = CRAWL_TASK_TYPE.BEST_SELLERS
+  ): Promise<AmazonRankingPageResult> {
+    return await amazonClient.fetchRankingPage(cookies, marketplace, taskType)
   }
 
   public async fetchHtml(url: string, cookies: string, signal?: AbortSignal): Promise<string> {
@@ -124,7 +123,7 @@ class CrawlerService {
       throw new Error('当前已有正在执行或停止中的爬虫任务！')
     }
 
-    if (config.taskType !== CRAWL_TASK_TYPE.BEST_SELLERS) {
+    if (!isCrawlTaskType(config.taskType)) {
       throw new Error('暂不支持该采集任务类型')
     }
 
@@ -137,7 +136,7 @@ class CrawlerService {
 
     this.prepareTask(taskId, config)
     onProgress(
-      `[开始] 启动亚马逊智能爬虫系统... 任务名称: ${taskName} | 站点: ${marketplaceConfig.siteName} | 核心策略: "递归降级深度遍历 (DFS)"`
+      `[开始] 启动亚马逊智能爬虫系统... 任务名称: ${taskName} | 类型: ${CRAWL_TASK_TYPE_NAMES[config.taskType]} | 站点: ${marketplaceConfig.siteName} | 核心策略: "递归降级深度遍历 (DFS)"`
     )
 
     void this.runTask(taskId, config, marketplaceConfig, onProgress).catch((error) => {
@@ -349,13 +348,15 @@ class CrawlerService {
       return config.selectedCategories
     }
 
-    onProgress(`[首级] 正在读取 ${marketplaceConfig.siteName} 排行榜顶级核心主分类...`)
+    onProgress(
+      `[首级] 正在读取 ${marketplaceConfig.siteName} ${CRAWL_TASK_TYPE_NAMES[config.taskType]}顶级核心主分类...`
+    )
     const html = await this.fetchHtml(
-      createAmazonBestSellersUrl(marketplaceConfig.baseUrl),
+      createAmazonRankingUrl(marketplaceConfig.baseUrl, config.taskType),
       cookies,
       signal
     )
-    const categories = this.parseBestsellerCategories(html, marketplaceConfig.baseUrl)
+    const categories = this.parseRankingCategories(html, marketplaceConfig.baseUrl)
     if (categories.length === 0) {
       throw new Error('未能解析到任何顶级分类')
     }

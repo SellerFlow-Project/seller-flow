@@ -1,14 +1,14 @@
 import type {
   CRAWLER_RUN_STATE,
   CRAWL_STRATEGY,
-  CRAWL_TASK_TYPE,
   DELIVERY_DETAIL_ITEM_STATUS,
   DELIVERY_DETAIL_PHASE
 } from '../config/crawler'
 import type { AmazonMarketplace, AmazonCategory } from './amazon'
+import type { CrawlTaskType } from '../../shared/crawler'
 
 export type CrawlStrategy = (typeof CRAWL_STRATEGY)[keyof typeof CRAWL_STRATEGY]
-export type CrawlTaskType = (typeof CRAWL_TASK_TYPE)[keyof typeof CRAWL_TASK_TYPE]
+export type { CrawlTaskType } from '../../shared/crawler'
 export type CrawlerRunState = (typeof CRAWLER_RUN_STATE)[keyof typeof CRAWLER_RUN_STATE]
 export type DeliveryDetailPhase = (typeof DELIVERY_DETAIL_PHASE)[keyof typeof DELIVERY_DETAIL_PHASE]
 export type DeliveryDetailItemStatus =

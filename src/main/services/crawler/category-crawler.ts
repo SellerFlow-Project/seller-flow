@@ -16,9 +16,9 @@ import { createAbortError, getErrorMessage, isAbortError, throwIfAborted } from 
 import { databaseService } from '../database.service'
 import { amazonClient } from './amazon-client'
 import {
-  parseAmazonBestSellerHtml,
+  parseAmazonRankingHtml,
   parseAmazonPagination,
-  parseBestsellerChildCategories
+  parseAmazonRankingChildCategories
 } from './amazon-parser'
 import { AmazonRiskControlError, SellerSpriteAuthenticationError } from './errors'
 import { mergeProductsWithSellerSpriteDetails } from './sellersprite-enrichment'
@@ -127,7 +127,7 @@ export class AmazonCategoryCrawler {
       try {
         const html = await amazonClient.fetchHtml(currentPageUrl, cookies, signal)
         this.throwIfCancelled(signal)
-        const products = parseAmazonBestSellerHtml(html)
+        const products = parseAmazonRankingHtml(html)
         onProgress(`[DFS] ${indent}  ✅ Page ${page} 成功！获取到 ${products.length} 个排名商品`)
         this.assertProductsParsed(products.length, onProgress)
 
@@ -224,7 +224,7 @@ export class AmazonCategoryCrawler {
     try {
       const html = await amazonClient.fetchHtml(category.href, cookies, signal)
       this.throwIfCancelled(signal)
-      const categories = parseBestsellerChildCategories(html, category.href)
+      const categories = parseAmazonRankingChildCategories(html, category.href)
 
       if (categories.length > 0) {
         onProgress(`[DFS] ${indent}  🌿 成功解析到下级子分类 ${categories.length} 个`)

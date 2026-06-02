@@ -1,4 +1,5 @@
 import type { AmazonMarketplace, AmazonMarketplaceConfig } from '../types/amazon'
+import { CRAWL_TASK_TYPE, type CrawlTaskType } from '../../shared/crawler'
 import { HTTP_HEADER } from './http'
 
 export const AMAZON_MARKETPLACE = {
@@ -21,15 +22,20 @@ export const AMAZON_PATH = {
   ADDRESS_SELECTIONS:
     '/portal-migration/hz/glow/get-rendered-address-selections?deviceType=desktop&pageType=Search&storeContext=NoStoreName&actionSource=desktop-modal',
   ADDRESS_CHANGE: '/portal-migration/hz/glow/address-change?actionSource=glow',
-  BEST_SELLERS: '/ranking?type=top-sellers&ref_=nav_cs_bestsellers',
   PRODUCT_DETAIL_PREFIX: '/dp/',
   PRODUCT_DETAIL_SUFFIX: '?psc=1'
 } as const
-export const AMAZON_BEST_SELLERS_CONTENT_MARKERS = [
+export const AMAZON_RANKING_ENTRY_PATHS: Record<CrawlTaskType, string> = {
+  [CRAWL_TASK_TYPE.BEST_SELLERS]: '/ranking?type=top-sellers&ref_=nav_cs_bestsellers',
+  [CRAWL_TASK_TYPE.NEW_RELEASES]: '/gp/new-releases/ref=zg_bs_tab_bsnr'
+}
+export const AMAZON_RANKING_CONTENT_MARKERS = [
   '売れ筋',
+  '新着ランキング',
   'ランキング',
   'bestsellers',
-  'Best Sellers'
+  'Best Sellers',
+  'New Releases'
 ] as const
 export const AMAZON_RISK_CONTROL_HTTP_STATUS = new Set([403, 429, 503])
 export const AMAZON_RISK_CONTROL_HTML_MARKERS = [
@@ -115,8 +121,8 @@ export function createAmazonProxyUrl(url: string): string {
     : `${AMAZON_PROXY_URL_PREFIX}${encodeURIComponent(url)}`
 }
 
-export function createAmazonBestSellersUrl(baseUrl: string): string {
-  return `${baseUrl}${AMAZON_PATH.BEST_SELLERS}`
+export function createAmazonRankingUrl(baseUrl: string, taskType: CrawlTaskType): string {
+  return `${baseUrl}${AMAZON_RANKING_ENTRY_PATHS[taskType]}`
 }
 
 export function createAmazonProductDetailUrl(baseUrl: string, asin: string): string {

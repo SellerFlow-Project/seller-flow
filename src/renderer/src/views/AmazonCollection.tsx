@@ -98,6 +98,7 @@ export const AmazonCollection: React.FC = () => {
   // 💡 Category Customization States
   const [isFetchingCats, setIsFetchingCats] = useState(false)
   const [showAdjustModal, setShowAdjustModal] = useState(false)
+  const [preparedTaskType, setPreparedTaskType] = useState<CrawlTaskType | null>(null)
   const [tempCategories, setTempCategories] = useState<
     { name: string; href: string; enabled: boolean }[]
   >([])
@@ -216,16 +217,19 @@ export const AmazonCollection: React.FC = () => {
    * 拦截并开始准备采集：获取分类并打开弹窗
    */
   const startCrawl = async () => {
+    const requestedTaskType = taskType
     setIsFetchingCats(true)
+    setPreparedTaskType(null)
     setLogs((prev) => [
       ...prev,
-      `[系统] 正在准备开启 ${MarketplaceConfigs[marketplace].name} 采集任务...`
+      `[系统] 正在准备开启 ${MarketplaceConfigs[marketplace].name} ${CrawlTaskTypeNames[requestedTaskType]}...`
     ])
     setLogs((prev) => [...prev, '[系统] 正在动态获取 Cookie 凭证并尝试抓取排行榜顶级分类数据...'])
 
     try {
       const res = await window.electron.ipcRenderer.invoke('crawler:get-amazon-cookies', {
-        marketplace
+        marketplace,
+        taskType: requestedTaskType
       })
 
       if (!res.success) {
@@ -244,6 +248,7 @@ export const AmazonCollection: React.FC = () => {
 
       setOriginalCategories(JSON.parse(JSON.stringify(formattedCats)))
       setTempCategories(formattedCats)
+      setPreparedTaskType(requestedTaskType)
       setShowAdjustModal(true)
       setLogs((prev) => [
         ...prev,
@@ -277,6 +282,11 @@ export const AmazonCollection: React.FC = () => {
   }
 
   const confirmAndStartCrawl = async () => {
+    if (!preparedTaskType) {
+      alert('排行榜任务尚未准备完成，请重新获取分类。')
+      return
+    }
+
     const selectedCategories = tempCategories
       .filter((c) => c.enabled)
       .map((c) => ({ name: c.name, href: c.href }))
@@ -289,7 +299,7 @@ export const AmazonCollection: React.FC = () => {
     setShowAdjustModal(false)
     setIsCrawling(true)
     setIsStopping(false)
-    setLogs(['[系统] 正在向主进程引擎发起排行榜深度 DFS 采集指令...'])
+    setLogs([`[系统] 正在向主进程引擎发起${CrawlTaskTypeNames[preparedTaskType]}深度 DFS 采集指令...`])
 
     // 重置实时拓扑状态
     setFirstLevelCats([])
@@ -305,7 +315,7 @@ export const AmazonCollection: React.FC = () => {
 
     try {
       const res = await window.electron.ipcRenderer.invoke('crawler:start-task', {
-        taskType,
+        taskType: preparedTaskType,
         marketplace,
         crawlStrategy,
         selectedCategories // 传递过滤并排序后的首级分类列表
@@ -337,6 +347,7 @@ export const AmazonCollection: React.FC = () => {
    */
   const cancelCrawlPreparation = () => {
     setShowAdjustModal(false)
+    setPreparedTaskType(null)
     setLogs((prev) => [...prev, '[系统] 用户取消了分类调整，采集任务已终止。'])
   }
 
@@ -551,7 +562,7 @@ export const AmazonCollection: React.FC = () => {
                 <select
                   value={taskType}
                   onChange={(e) => setTaskType(e.target.value as CrawlTaskType)}
-                  disabled={isCrawling}
+                  disabled={isCrawling || isFetchingCats || showAdjustModal}
                   className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all-200 cursor-pointer"
                 >
                   {Object.values(CrawlTaskType).map((type) => (

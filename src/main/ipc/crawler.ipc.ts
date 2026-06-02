@@ -1,4 +1,5 @@
 import { DEFAULT_AMAZON_MARKETPLACE } from '../config/amazon'
+import { CRAWL_TASK_TYPE, CRAWL_TASK_TYPE_NAMES, isCrawlTaskType } from '../../shared/crawler'
 import { IPC_CHANNEL } from '../config/ipc'
 import type { CrawlTaskConfig } from '../types/crawler'
 import { sendCrawlerLog } from '../utils/window-bus'
@@ -29,16 +30,23 @@ export function registerCrawlerIPC(): void {
   // 从亚马逊获取最新的配送地址 Cookie 并链式抓取排行榜页面数据 (支持指定站点)
   handleIpc(
     IPC_CHANNEL.CRAWLER.GET_AMAZON_COOKIES,
-    async (_event, args?: { marketplace?: string }) => {
+    async (_event, args?: { marketplace?: string; taskType?: unknown }) => {
       const marketplace = args?.marketplace || DEFAULT_AMAZON_MARKETPLACE
-      console.log(`[IPC] 开始链式调试：动态 Cookie 交换 -> 抓取 ${marketplace} 排行榜 HTML 报文`)
+      const taskType = args?.taskType ?? CRAWL_TASK_TYPE.BEST_SELLERS
+      if (!isCrawlTaskType(taskType)) {
+        throw new Error('暂不支持该采集任务类型')
+      }
+      console.log(
+        `[IPC] 开始链式调试：动态 Cookie 交换 -> 抓取 ${marketplace} ${CRAWL_TASK_TYPE_NAMES[taskType]} HTML 报文`
+      )
 
       const cookieResult = await crawlerService.getAmazonCookies(marketplace)
-      console.log(`[IPC] 携带 Cookie 启动 ${marketplace} 排行榜拉取...`)
+      console.log(`[IPC] 携带 Cookie 启动 ${marketplace} ${CRAWL_TASK_TYPE_NAMES[taskType]}拉取...`)
 
-      const pageResult = await crawlerService.fetchBestSellersPage(
+      const pageResult = await crawlerService.fetchRankingPage(
         cookieResult.cookies,
-        marketplace
+        marketplace,
+        taskType
       )
 
       return {

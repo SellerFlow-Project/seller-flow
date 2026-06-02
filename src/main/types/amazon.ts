@@ -37,7 +37,7 @@ export interface AmazonCookieResult {
   error?: string
 }
 
-export interface AmazonBestSellersPageResult {
+export interface AmazonRankingPageResult {
   success: boolean
   htmlLength: number
   htmlSnippet: string

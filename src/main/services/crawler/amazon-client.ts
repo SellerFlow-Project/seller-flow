@@ -1,6 +1,6 @@
 import {
   AMAZON_ADDRESS_CHANGE_PAYLOAD,
-  AMAZON_BEST_SELLERS_CONTENT_MARKERS,
+  AMAZON_RANKING_CONTENT_MARKERS,
   AMAZON_CSRF_HEADER,
   AMAZON_FALLBACK_COOKIE_VALUE,
   AMAZON_HTTP_HEADER_VALUE,
@@ -11,15 +11,16 @@ import {
   AMAZON_SESSION_COOKIE_NAME,
   AMAZON_UBID_COOKIE_PREFIX,
   DEFAULT_AMAZON_MARKETPLACE,
-  createAmazonBestSellersUrl,
   createAmazonHtmlHeaders,
   createAmazonProxyUrl,
+  createAmazonRankingUrl,
   createAmazonUrl,
   resolveAmazonMarketplace
 } from '../../config/amazon'
+import { CRAWL_TASK_TYPE, type CrawlTaskType } from '../../../shared/crawler'
 import { CRAWLER_HTML_SNIPPET_LENGTH, CRAWLER_HTML_SNIPPET_SUFFIX } from '../../config/crawler'
 import { HTTP_HEADER, HTTP_METHOD, MIME_TYPE } from '../../config/http'
-import type { AmazonBestSellersPageResult, AmazonCookieResult } from '../../types/amazon'
+import type { AmazonCookieResult, AmazonRankingPageResult } from '../../types/amazon'
 import {
   findCookieValueByPrefix,
   parseSetCookieHeaders,
@@ -28,7 +29,7 @@ import {
 import { getErrorMessage, isAbortError } from '../../utils/error'
 import { fetchResponse, fetchText, HttpStatusError, rotateUserAgent } from '../../utils/http'
 import { sleep } from '../../utils/time'
-import { parseBestsellerCategories } from './amazon-parser'
+import { parseAmazonRankingCategories } from './amazon-parser'
 import { AmazonRiskControlError } from './errors'
 import { sleepForCrawlerRequestDelay } from './runtime-settings'
 
@@ -239,14 +240,15 @@ export class AmazonClient {
     )
   }
 
-  public async fetchBestSellersPage(
+  public async fetchRankingPage(
     cookies: string,
-    marketplace: string = DEFAULT_AMAZON_MARKETPLACE
-  ): Promise<AmazonBestSellersPageResult> {
+    marketplace: string = DEFAULT_AMAZON_MARKETPLACE,
+    taskType: CrawlTaskType = CRAWL_TASK_TYPE.BEST_SELLERS
+  ): Promise<AmazonRankingPageResult> {
     try {
       const marketplaceConfig = resolveAmazonMarketplace(marketplace)
       const html = await this.fetchHtml(
-        createAmazonBestSellersUrl(marketplaceConfig.baseUrl),
+        createAmazonRankingUrl(marketplaceConfig.baseUrl, taskType),
         cookies
       )
 
@@ -254,8 +256,8 @@ export class AmazonClient {
         success: true,
         htmlLength: html.length,
         htmlSnippet: html.substring(0, CRAWLER_HTML_SNIPPET_LENGTH) + CRAWLER_HTML_SNIPPET_SUFFIX,
-        isJapanese: AMAZON_BEST_SELLERS_CONTENT_MARKERS.some((marker) => html.includes(marker)),
-        categories: parseBestsellerCategories(html, marketplaceConfig.baseUrl)
+        isJapanese: AMAZON_RANKING_CONTENT_MARKERS.some((marker) => html.includes(marker)),
+        categories: parseAmazonRankingCategories(html, marketplaceConfig.baseUrl)
       }
     } catch (error) {
       return {

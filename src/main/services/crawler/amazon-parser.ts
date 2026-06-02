@@ -159,7 +159,7 @@ export function parseAmazonPagination(
   }
 }
 
-export function parseAmazonBestSellerHtml(html: string): AmazonParsedProduct[] {
+export function parseAmazonRankingHtml(html: string): AmazonParsedProduct[] {
   const $ = cheerio.load(html)
 
   let cards = $('div[id^="p13n-asin-index-"].p13n-grid-content').toArray()
@@ -198,7 +198,7 @@ export function parseAmazonBestSellerHtml(html: string): AmazonParsedProduct[] {
   return results
 }
 
-export function parseBestsellerCategories(
+export function parseAmazonRankingCategories(
   html: string,
   baseUrl = DEFAULT_AMAZON_BASE_URL
 ): AmazonCategory[] {
@@ -223,7 +223,7 @@ export function parseBestsellerCategories(
   return categories
 }
 
-export function parseBestsellerChildCategories(
+export function parseAmazonRankingChildCategories(
   html: string,
   currentUrl = DEFAULT_AMAZON_BASE_URL
 ): AmazonCategory[] {
@@ -282,3 +282,7 @@ export {
   findTitle,
   findPrice
 }
+
+export const parseAmazonBestSellerHtml = parseAmazonRankingHtml
+export const parseBestsellerCategories = parseAmazonRankingCategories
+export const parseBestsellerChildCategories = parseAmazonRankingChildCategories

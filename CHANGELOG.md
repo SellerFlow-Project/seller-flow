@@ -4,6 +4,10 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-06-02
+
+- 新增新品排行榜采集任务
+
 ## [0.1.2] - 2026-06-02
 
 - 亚马逊爬虫请求统一通过代理服务器转发，并保留完整的目标 URL 查询参数

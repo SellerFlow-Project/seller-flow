@@ -1,6 +1,4 @@
-export const CRAWL_TASK_TYPE = {
-  BEST_SELLERS: 'best_sellers'
-} as const
+export { CRAWL_TASK_TYPE } from '../../shared/crawler'
 
 export const CRAWL_STRATEGY = {
   STRATEGY_1: 'strategy1',
