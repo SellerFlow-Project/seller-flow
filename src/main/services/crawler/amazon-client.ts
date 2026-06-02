@@ -13,6 +13,7 @@ import {
   DEFAULT_AMAZON_MARKETPLACE,
   createAmazonBestSellersUrl,
   createAmazonHtmlHeaders,
+  createAmazonProxyUrl,
   createAmazonUrl,
   resolveAmazonMarketplace
 } from '../../config/amazon'
@@ -122,7 +123,7 @@ export class AmazonClient {
     try {
       await sleepForCrawlerRequestDelay(signal)
       const sessionResponse = await fetchResponse(
-        cookieProbeUrl,
+        createAmazonProxyUrl(cookieProbeUrl),
         { headers: createCookieProbeHeaders(), signal },
         { errorPrefix: '首页访问失败' }
       )
@@ -139,7 +140,7 @@ export class AmazonClient {
       )
       await sleepForCrawlerRequestDelay(signal)
       const addressResponse = await fetchResponse(
-        createAmazonUrl(domain, AMAZON_PATH.ADDRESS_CHANGE),
+        createAmazonProxyUrl(createAmazonUrl(domain, AMAZON_PATH.ADDRESS_CHANGE)),
         {
           method: HTTP_METHOD.POST,
           body: JSON.stringify({
@@ -204,7 +205,7 @@ export class AmazonClient {
       try {
         await sleepForCrawlerRequestDelay(signal)
         const html = await fetchText(
-          url,
+          createAmazonProxyUrl(url),
           { headers: createAmazonHtmlHeaders(cookies), signal },
           { errorPrefix: '页面抓取异常' }
         )
@@ -277,10 +278,13 @@ export class AmazonClient {
   ): Promise<string> {
     try {
       await sleepForCrawlerRequestDelay(signal)
-      const html = await fetchText(createAmazonUrl(domain, AMAZON_PATH.ADDRESS_SELECTIONS), {
-        headers: createAddressSelectionHeaders(referer, cookies, sourceCsrfToken),
-        signal
-      })
+      const html = await fetchText(
+        createAmazonProxyUrl(createAmazonUrl(domain, AMAZON_PATH.ADDRESS_SELECTIONS)),
+        {
+          headers: createAddressSelectionHeaders(referer, cookies, sourceCsrfToken),
+          signal
+        }
+      )
       return html.match(ADDRESS_SELECTION_CSRF_TOKEN_RE)?.[1] || ''
     } catch (error) {
       if (isAbortError(error)) throw error

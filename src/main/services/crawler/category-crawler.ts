@@ -114,9 +114,14 @@ export class AmazonCategoryCrawler {
     let currentPageUrl = category.href
     let page = CRAWLER_INITIAL_PAGE
     let hasMore = true
+    const visitedPageUrls = new Set<string>()
 
     while (hasMore) {
       this.throwIfCancelled(signal)
+      if (visitedPageUrls.has(currentPageUrl)) {
+        throw new Error(`检测到商品分页链接循环，已停止重复抓取: ${currentPageUrl}`)
+      }
+      visitedPageUrls.add(currentPageUrl)
       onProgress(`[DFS] ${indent}  📥 正在抓取商品列表 (Page ${page})...`)
 
       try {
@@ -146,6 +151,9 @@ export class AmazonCategoryCrawler {
         hasMore = pagination.hasNextPage && Boolean(pagination.nextPageUrl)
 
         if (hasMore) {
+          if (visitedPageUrls.has(pagination.nextPageUrl)) {
+            throw new Error(`检测到商品分页链接循环，已停止重复抓取: ${pagination.nextPageUrl}`)
+          }
           currentPageUrl = pagination.nextPageUrl
           page = pagination.currentPage
             ? pagination.currentPage + CRAWLER_PAGE_STEP
