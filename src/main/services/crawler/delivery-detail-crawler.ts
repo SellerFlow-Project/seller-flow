@@ -23,6 +23,7 @@ import { databaseService } from '../database.service'
 import { amazonClient } from './amazon-client'
 import { parseAmazonDeliveryDetailHtml } from './delivery-parser'
 import { AmazonRiskControlError } from './errors'
+import { retryWithCrawlerRecovery } from './recovery'
 
 interface DeliveryDetailCrawlerOptions {
   taskId: number
@@ -56,6 +57,7 @@ function createInitialState(concurrency: number): DeliveryDetailState {
 export class AmazonDeliveryDetailCrawler {
   private state = createInitialState(1)
   private readonly concurrencyChangeHandlers = new Set<() => void>()
+  private activeRecoveryCount = 0
 
   public constructor(private readonly onStateChange: StateChangeHandler) {}
 
@@ -67,6 +69,7 @@ export class AmazonDeliveryDetailCrawler {
   }
 
   public reset(): void {
+    this.activeRecoveryCount = 0
     this.state = createInitialState(this.state.concurrency)
     this.notifyStateChange()
   }
@@ -89,16 +92,20 @@ export class AmazonDeliveryDetailCrawler {
   }
 
   public markIdle(): void {
+    this.activeRecoveryCount = 0
     this.state.phase = DELIVERY_DETAIL_PHASE.IDLE
+    this.state.lastError = undefined
     this.notifyStateChange()
   }
 
   public stop(): void {
+    this.activeRecoveryCount = 0
     this.state.phase = DELIVERY_DETAIL_PHASE.STOPPING
     this.notifyStateChange()
   }
 
   public fail(error: unknown): void {
+    this.activeRecoveryCount = 0
     this.state.phase = DELIVERY_DETAIL_PHASE.FAILED
     this.state.lastError = getErrorMessage(error)
     this.notifyStateChange()
@@ -120,6 +127,7 @@ export class AmazonDeliveryDetailCrawler {
 
     while (true) {
       throwIfAborted(signal)
+      const sourceComplete = isSourceComplete()
       const batch = databaseService.queryPendingDeliveryDetails(
         taskId,
         DELIVERY_DETAIL_BATCH_SIZE,
@@ -127,13 +135,8 @@ export class AmazonDeliveryDetailCrawler {
       )
       this.updateWaitingProductCount(batch.length)
 
-      if (batch.length < DELIVERY_DETAIL_BATCH_SIZE) {
-        if (isSourceComplete()) {
-          if (batch.length > 0) {
-            onProgress(
-              `[详情] 剩余 ${batch.length} 个未采集配送天数的商品，不足完整批次 ${DELIVERY_DETAIL_BATCH_SIZE}，按批处理规则暂不抓取。`
-            )
-          }
+      if (batch.length === 0) {
+        if (sourceComplete) {
           this.setPhase(DELIVERY_DETAIL_PHASE.COMPLETED)
           return
         }
@@ -142,12 +145,23 @@ export class AmazonDeliveryDetailCrawler {
         continue
       }
 
+      if (batch.length < DELIVERY_DETAIL_BATCH_SIZE && !sourceComplete) {
+        await sleep(DELIVERY_DETAIL_POLL_INTERVAL_MS, signal)
+        continue
+      }
+
+      if (batch.length < DELIVERY_DETAIL_BATCH_SIZE && sourceComplete) {
+        onProgress(
+          `[详情] 源采集已完成，开始处理剩余 ${batch.length} 个不足整批的商品详情。`
+        )
+      }
+
       try {
         await this.processBatch(batch, marketplace, cookies, deferredProductIds, onProgress, signal)
       } catch (error) {
         if (!(error instanceof AmazonRiskControlError)) throw error
 
-        await this.waitForRiskControlCooldown(error, onProgress, signal)
+        await this.waitForRiskControlCooldown(error, onProgress, signal, batch.length)
       }
     }
   }
@@ -212,10 +226,28 @@ export class AmazonDeliveryDetailCrawler {
 
     try {
       const marketplaceConfig = resolveAmazonMarketplace(marketplace)
-      const html = await amazonClient.fetchHtml(
-        createAmazonProductDetailUrl(marketplaceConfig.baseUrl, product.asin),
-        cookies,
-        signal
+      const detailUrl = createAmazonProductDetailUrl(marketplaceConfig.baseUrl, product.asin)
+      const html = await retryWithCrawlerRecovery(
+        () => amazonClient.fetchHtml(detailUrl, cookies, signal),
+        {
+          scope: `[详情] 商品 ${product.asin} 详情页 | URL: ${detailUrl}`,
+          onProgress,
+          signal,
+          onCooldownStart: (error) => {
+            this.beginRecoveryCooldown(error)
+            this.updateQueueItem(product.id, {
+              status: DELIVERY_DETAIL_ITEM_STATUS.FAILED,
+              error: getErrorMessage(error)
+            })
+          },
+          onCooldownEnd: () => {
+            this.endRecoveryCooldown()
+            this.updateQueueItem(product.id, {
+              status: DELIVERY_DETAIL_ITEM_STATUS.FETCHING,
+              error: undefined
+            })
+          }
+        }
       )
       throwIfAborted(signal)
       const { deliveryDays } = parseAmazonDeliveryDetailHtml(html, marketplace)
@@ -313,12 +345,15 @@ export class AmazonDeliveryDetailCrawler {
   private async waitForRiskControlCooldown(
     error: AmazonRiskControlError,
     onProgress: CrawlerProgressHandler,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    batchSize?: number
   ): Promise<void> {
     this.state.phase = DELIVERY_DETAIL_PHASE.RISK_CONTROL_COOLDOWN
     this.state.lastError = getErrorMessage(error)
     this.notifyStateChange()
-    onProgress('[风控] 商品详情并发采集暂停，等待 5 分钟后自动继续。')
+    onProgress(
+      `[风控] 商品详情并发采集暂停，等待 10 分钟后从当前批次重新尝试。${batchSize ? `当前批次 ${batchSize} 个商品。` : ''}`
+    )
 
     await sleep(DELIVERY_DETAIL_RISK_CONTROL_COOLDOWN_MS, signal)
     throwIfAborted(signal)
@@ -326,6 +361,21 @@ export class AmazonDeliveryDetailCrawler {
     this.state.lastError = undefined
     this.setPhase(DELIVERY_DETAIL_PHASE.WAITING)
     onProgress('[详情] 商品详情风控冷却结束，重新尝试采集待处理商品。')
+  }
+
+  private beginRecoveryCooldown(error: unknown): void {
+    this.activeRecoveryCount++
+    this.state.phase = DELIVERY_DETAIL_PHASE.RISK_CONTROL_COOLDOWN
+    this.state.lastError = getErrorMessage(error)
+    this.notifyStateChange()
+  }
+
+  private endRecoveryCooldown(): void {
+    this.activeRecoveryCount = Math.max(0, this.activeRecoveryCount - 1)
+    if (this.activeRecoveryCount > 0) return
+
+    this.state.lastError = undefined
+    this.setPhase(DELIVERY_DETAIL_PHASE.RUNNING)
   }
 
   private updateQueueItem(productId: number, patch: Partial<DeliveryDetailQueueItem>): void {

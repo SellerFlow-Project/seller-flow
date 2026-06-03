@@ -34,6 +34,7 @@ import {
 } from './crawler/amazon-parser'
 import { AmazonCategoryCrawler } from './crawler/category-crawler'
 import { AmazonDeliveryDetailCrawler } from './crawler/delivery-detail-crawler'
+import { retryWithCrawlerRecovery } from './crawler/recovery'
 import { databaseService } from './database.service'
 import { getCrawlingSettings } from './settings.service'
 
@@ -351,10 +352,14 @@ class CrawlerService {
     onProgress(
       `[首级] 正在读取 ${marketplaceConfig.siteName} ${CRAWL_TASK_TYPE_NAMES[config.taskType]}顶级核心主分类...`
     )
-    const html = await this.fetchHtml(
-      createAmazonRankingUrl(marketplaceConfig.baseUrl, config.taskType),
-      cookies,
-      signal
+    const rankingUrl = createAmazonRankingUrl(marketplaceConfig.baseUrl, config.taskType)
+    const html = await retryWithCrawlerRecovery(
+      () => this.fetchHtml(rankingUrl, cookies, signal),
+      {
+        scope: `[首级] ${marketplaceConfig.siteName} ${CRAWL_TASK_TYPE_NAMES[config.taskType]}入口页 | URL: ${rankingUrl}`,
+        onProgress,
+        signal
+      }
     )
     const categories = this.parseRankingCategories(html, marketplaceConfig.baseUrl)
     if (categories.length === 0) {

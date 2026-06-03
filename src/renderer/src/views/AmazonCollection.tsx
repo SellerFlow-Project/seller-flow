@@ -590,7 +590,7 @@ export const AmazonCollection: React.FC = () => {
       : deliveryDetail.phase === 'waiting'
         ? `等待满批 (${deliveryDetail.waitingProductCount}/${deliveryDetail.batchSize})`
         : deliveryDetail.phase === 'risk_control_cooldown'
-          ? '触发风控，冷却 5 分钟后自动重试'
+          ? '请求异常/风控，冷却 10 分钟后自动重试'
         : deliveryDetail.phase === 'stopping'
           ? '正在停止'
           : deliveryDetail.phase === 'failed'

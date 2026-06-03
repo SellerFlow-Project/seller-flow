@@ -6,7 +6,6 @@ import {
   CRAWLER_DEPTH_INDENT,
   CRAWLER_FIRST_LEVEL_DEPTH,
   CRAWLER_INITIAL_PAGE,
-  CRAWLER_MAX_CONSECUTIVE_EMPTY_PRODUCT_PAGES,
   CRAWLER_PAGE_STEP
 } from '../../config/crawler'
 import type { AmazonCategory } from '../../types/amazon'
@@ -20,7 +19,8 @@ import {
   parseAmazonPagination,
   parseAmazonRankingChildCategories
 } from './amazon-parser'
-import { AmazonRiskControlError, SellerSpriteAuthenticationError } from './errors'
+import { SellerSpriteAuthenticationError } from './errors'
+import { retryWithCrawlerRecovery } from './recovery'
 import { mergeProductsWithSellerSpriteDetails } from './sellersprite-enrichment'
 import { sellerSpriteSessionService } from './sellersprite-session'
 
@@ -30,7 +30,6 @@ type ActivePathChangeHandler = (activePath: DfsPathNode[]) => void
 export class AmazonCategoryCrawler {
   private readonly visitedUrls = new Set<string>()
   private readonly activePath: DfsPathNode[] = []
-  private consecutiveEmptyProductPages = 0
 
   public constructor(
     private readonly isCancelled: CancellationChecker,
@@ -40,7 +39,6 @@ export class AmazonCategoryCrawler {
   public reset(): void {
     this.visitedUrls.clear()
     this.activePath.length = 0
-    this.consecutiveEmptyProductPages = 0
     this.notifyActivePathChange()
   }
 
@@ -125,11 +123,16 @@ export class AmazonCategoryCrawler {
       onProgress(`[DFS] ${indent}  📥 正在抓取商品列表 (Page ${page})...`)
 
       try {
-        const html = await amazonClient.fetchHtml(currentPageUrl, cookies, signal)
+        const html = await this.fetchHtmlWithRecovery(
+          currentPageUrl,
+          cookies,
+          `[DFS] ${indent}商品列表 Page ${page}`,
+          onProgress,
+          signal
+        )
         this.throwIfCancelled(signal)
         const products = parseAmazonRankingHtml(html)
         onProgress(`[DFS] ${indent}  ✅ Page ${page} 成功！获取到 ${products.length} 个排名商品`)
-        this.assertProductsParsed(products.length, onProgress)
 
         const quickViewData = await this.getQuickViewData(products, indent, onProgress, signal)
         this.throwIfCancelled(signal)
@@ -144,7 +147,9 @@ export class AmazonCategoryCrawler {
             `[数据] ${indent}    💾 [写入DB] 本页已入库 ${products.length} 个商品，其中 ${enrichedCount} 个包含卖家精灵数据。`
           )
         } else {
-          onProgress(`[数据] ${indent}    💾 [写入DB] 本页无商品可写入。`)
+          onProgress(
+            `[数据] ${indent}    💾 [写入DB] 本页解析到 0 个商品，按空分类/空分页处理，不触发风控熔断。`
+          )
         }
 
         const pagination = parseAmazonPagination(cheerio.load(html), currentPageUrl)
@@ -222,14 +227,22 @@ export class AmazonCategoryCrawler {
     signal?: AbortSignal
   ): Promise<AmazonCategory[]> {
     try {
-      const html = await amazonClient.fetchHtml(category.href, cookies, signal)
+      const html = await this.fetchHtmlWithRecovery(
+        category.href,
+        cookies,
+        `[DFS] ${indent}子分类导航 [${category.name}]`,
+        onProgress,
+        signal
+      )
       this.throwIfCancelled(signal)
       const categories = parseAmazonRankingChildCategories(html, category.href)
 
       if (categories.length > 0) {
         onProgress(`[DFS] ${indent}  🌿 成功解析到下级子分类 ${categories.length} 个`)
       } else if (currentDepth === CRAWLER_FIRST_LEVEL_DEPTH) {
-        throw new AmazonRiskControlError('一级分类未解析到任何子分类，可能已进入亚马逊风控验证页')
+        onProgress(
+          `[DFS] ${indent}  🍃 一级分类未解析到下级子分类，按无子分类处理，不触发风控熔断。`
+        )
       } else {
         onProgress(`[DFS] ${indent}  🍃 已经到达叶子节点（最深层级类目，无对应 href）`)
       }
@@ -245,19 +258,21 @@ export class AmazonCategoryCrawler {
     this.onActivePathChange(this.getActivePath())
   }
 
-  private assertProductsParsed(productCount: number, onProgress: CrawlerProgressHandler): void {
-    if (productCount > 0) {
-      this.consecutiveEmptyProductPages = 0
-      return
-    }
-
-    this.consecutiveEmptyProductPages++
-    onProgress(
-      `[警告] 亚马逊商品页连续 ${this.consecutiveEmptyProductPages}/${CRAWLER_MAX_CONSECUTIVE_EMPTY_PRODUCT_PAGES} 次解析为 0 个商品，可能已进入风控验证页。`
+  private async fetchHtmlWithRecovery(
+    url: string,
+    cookies: string,
+    scope: string,
+    onProgress: CrawlerProgressHandler,
+    signal?: AbortSignal
+  ): Promise<string> {
+    return await retryWithCrawlerRecovery(
+      () => amazonClient.fetchHtml(url, cookies, signal),
+      {
+        scope: `${scope} | URL: ${url}`,
+        onProgress,
+        signal
+      }
     )
-    if (this.consecutiveEmptyProductPages >= CRAWLER_MAX_CONSECUTIVE_EMPTY_PRODUCT_PAGES) {
-      throw new AmazonRiskControlError('亚马逊商品页连续返回空数据，已停止任务以避免误报完成')
-    }
   }
 
   private throwIfCancelled(signal?: AbortSignal): void {
