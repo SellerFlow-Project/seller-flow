@@ -16,6 +16,11 @@ import {
   isSessionCheckResult,
   type AccountApi
 } from '../shared/account'
+import {
+  isDataSharingStatus,
+  isSharedDataSource,
+  type DataSharingApi
+} from '../shared/data-sharing'
 import type { AppUpdateApi, AppUpdateState } from '../shared/update'
 
 // Custom APIs for renderer
@@ -133,8 +138,29 @@ const account: AccountApi = {
     )
 }
 
+const dataSharing: DataSharingApi = {
+  getStatus: () => invokeAccount('data-sharing:get-status', [], isDataSharingStatus),
+  discoverSources: () =>
+    invokeAccount(
+      'data-sharing:discover-sources',
+      [],
+      (value): value is Awaited<ReturnType<DataSharingApi['discoverSources']>> =>
+        Array.isArray(value) && value.every(isSharedDataSource)
+    ),
+  getRemoteTasks: (source) => invokeAccount('data-sharing:get-remote-tasks', [source]),
+  getRemoteCategories: (source, taskId) =>
+    invokeAccount('data-sharing:get-remote-categories', [source, taskId]),
+  getRemoteSellerTypes: (source, taskId) =>
+    invokeAccount('data-sharing:get-remote-seller-types', [source, taskId]),
+  queryRemoteProducts: (source, filter) =>
+    invokeAccount('data-sharing:query-remote-products', [source, filter]),
+  getRemoteProductBsrRanks: (source, productId) =>
+    invokeAccount('data-sharing:get-remote-product-bsr-ranks', [source, productId])
+}
+
 const api = {
   account,
+  dataSharing,
   settings,
   updates
 }

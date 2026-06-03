@@ -33,11 +33,19 @@ export interface AiSettings {
   imageApiKey: string
 }
 
+export interface DataSharingSettings {
+  serverEnabled: boolean
+  serverPort: number
+  deviceId: string
+  displayName: string
+}
+
 export interface SellerFlowSettings {
   application: ApplicationSettings
   notifications: NotificationSettings
   crawling: CrawlingSettings
   ai: AiSettings
+  dataSharing: DataSharingSettings
 }
 
 export interface SettingsApi {
@@ -91,7 +99,12 @@ export function isSellerFlowSettings(value: unknown): value is SellerFlowSetting
     typeof ai.textApiKey === 'string' &&
     typeof ai.imageApiEndpoint === 'string' &&
     typeof ai.imageModelName === 'string' &&
-    typeof ai.imageApiKey === 'string'
+    typeof ai.imageApiKey === 'string' &&
+    isRecord(value.dataSharing) &&
+    typeof value.dataSharing.serverEnabled === 'boolean' &&
+    typeof value.dataSharing.serverPort === 'number' &&
+    typeof value.dataSharing.deviceId === 'string' &&
+    typeof value.dataSharing.displayName === 'string'
   )
 }
 
@@ -122,5 +135,11 @@ export const DEFAULT_SELLER_FLOW_SETTINGS: SellerFlowSettings = {
     imageApiEndpoint: 'https://api.openai.com/v1',
     imageModelName: 'dall-e-3',
     imageApiKey: ''
+  },
+  dataSharing: {
+    serverEnabled: false,
+    serverPort: 48991,
+    deviceId: '',
+    displayName: 'SellerFlow 数据服务'
   }
 }

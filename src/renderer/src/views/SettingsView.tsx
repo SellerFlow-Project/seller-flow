@@ -21,6 +21,7 @@ import {
   type AiSettings,
   type ApplicationSettings,
   type CrawlingSettings,
+  type DataSharingSettings,
   type NotificationSettings,
   type SellerFlowSettings,
   type ThemeColor,
@@ -102,10 +103,10 @@ export const SettingsView: React.FC = () => {
   const [activeSection, setActiveSection] = useState<
     'app' | 'notifications' | 'crawling' | 'ai' | 'sharing' | 'about'
   >('app')
-  const [isServerEnabled, setIsServerEnabled] = useState(false)
   const [draftSettings, setDraftSettings] = useState<SellerFlowSettings>(() =>
     structuredClone(DEFAULT_SELLER_FLOW_SETTINGS)
   )
+  const [sharingStatusText, setSharingStatusText] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -177,6 +178,16 @@ export const SettingsView: React.FC = () => {
     }))
   }
 
+  const updateDataSharingDraft = (settings: Partial<DataSharingSettings>): void => {
+    setDraftSettings((currentSettings) => ({
+      ...currentSettings,
+      dataSharing: {
+        ...currentSettings.dataSharing,
+        ...settings
+      }
+    }))
+  }
+
   const handleSave = async (): Promise<void> => {
     setIsSaving(true)
     setSaveError('')
@@ -185,6 +196,14 @@ export const SettingsView: React.FC = () => {
       const savedSettings = await window.api.settings.save(draftSettings)
       setDraftSettings(savedSettings)
       applyApplicationSettings(savedSettings.application)
+      const sharingStatus = await window.api.dataSharing.getStatus()
+      setSharingStatusText(
+        sharingStatus.running
+          ? `数据共享服务已启动：${sharingStatus.baseUrl || ''}`
+          : sharingStatus.enabled
+            ? `数据共享服务未能启动：${sharingStatus.error || '未知错误'}`
+            : '数据共享服务已关闭。'
+      )
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 2500)
     } catch (error) {
@@ -211,7 +230,7 @@ export const SettingsView: React.FC = () => {
     { key: 'rose', bg: 'bg-rose-500', border: 'border-rose-400', name: '活力樱桃红' }
   ] as const
 
-  const { application, notifications, crawling, ai } = draftSettings
+  const { application, notifications, crawling, ai, dataSharing } = draftSettings
   const updateMessage = getUpdateMessage(updateState) || updateActionError
 
   return (
@@ -702,12 +721,54 @@ export const SettingsView: React.FC = () => {
 
                 <div className="bg-slate-50 dark:bg-zinc-900/20 border border-border/80 rounded-xl px-4 py-1">
                   <ToggleSwitch
-                    checked={isServerEnabled}
-                    onChange={setIsServerEnabled}
+                    checked={dataSharing.serverEnabled}
+                    onChange={(serverEnabled) => updateDataSharingDraft({ serverEnabled })}
                     label="将本机作为服务端"
                     description="启用后，本机将作为服务器端，同局域网内的其它客户端可以扫描发现并连接到当前客户端，且其它客户端可以实时浏览本机已采集的所有数据。"
                   />
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">
+                      服务端口
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={dataSharing.serverPort}
+                      onChange={(e) =>
+                        updateDataSharingDraft({ serverPort: Number(e.target.value) })
+                      }
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      默认 48991；如果端口被占用，系统会自动选择可用端口并广播。
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">
+                      局域网显示名称
+                    </label>
+                    <input
+                      type="text"
+                      value={dataSharing.displayName}
+                      onChange={(e) =>
+                        updateDataSharingDraft({ displayName: e.target.value.trim() })
+                      }
+                      className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      其它客户端扫描数据源时会看到这个名称。
+                    </p>
+                  </div>
+                </div>
+
+                {sharingStatusText && (
+                  <div className="rounded-lg border border-border bg-slate-50 dark:bg-zinc-900/30 px-4 py-3 text-xs font-semibold text-muted-foreground">
+                    {sharingStatusText}
+                  </div>
+                )}
               </div>
             )}
 
@@ -791,28 +852,26 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* Persistent Floating Save Configuration Section (Pinned at the bottom right) */}
-          {activeSection !== 'sharing' && (
-            <div className="flex items-center justify-between pt-5 border-t border-border mt-6">
-              <div className="flex-1 flex items-center">
-                {saveSuccess && (
-                  <div className="inline-flex items-center space-x-1.5 text-emerald-500 text-xs font-bold animate-fade-in">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>控制台配置更新应用成功！</span>
-                  </div>
-                )}
-                {saveError && <span className="text-xs font-semibold text-red-500">{saveError}</span>}
-              </div>
-
-              <button
-                onClick={() => void handleSave()}
-                disabled={isSaving}
-                className="inline-flex items-center justify-center space-x-2 bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-md hover:bg-primary/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>{isSaving ? '正在保存...' : '保存当前配置'}</span>
-              </button>
+          <div className="flex items-center justify-between pt-5 border-t border-border mt-6">
+            <div className="flex-1 flex items-center">
+              {saveSuccess && (
+                <div className="inline-flex items-center space-x-1.5 text-emerald-500 text-xs font-bold animate-fade-in">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>控制台配置更新应用成功！</span>
+                </div>
+              )}
+              {saveError && <span className="text-xs font-semibold text-red-500">{saveError}</span>}
             </div>
-          )}
+
+            <button
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="inline-flex items-center justify-center space-x-2 bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-md hover:bg-primary/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>{isSaving ? '正在保存...' : '保存当前配置'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

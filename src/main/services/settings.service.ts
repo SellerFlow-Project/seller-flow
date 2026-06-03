@@ -1,4 +1,5 @@
 import Store from 'electron-store'
+import { randomUUID } from 'crypto'
 import {
   DEFAULT_SELLER_FLOW_SETTINGS,
   type ApplicationSettings,
@@ -52,7 +53,12 @@ export function normalizeSettings(value: unknown): SellerFlowSettings {
   const notifications = getRecord(settings.notifications)
   const crawling = getRecord(settings.crawling)
   const ai = getRecord(settings.ai)
+  const dataSharing = getRecord(settings.dataSharing)
   const minDelay = getNumber(crawling.minDelay, DEFAULT_SELLER_FLOW_SETTINGS.crawling.minDelay, 0)
+  const dataSharingDeviceId = getString(
+    dataSharing.deviceId,
+    DEFAULT_SELLER_FLOW_SETTINGS.dataSharing.deviceId
+  )
 
   return {
     application: {
@@ -123,6 +129,20 @@ export function normalizeSettings(value: unknown): SellerFlowSettings {
       ),
       imageModelName: getString(ai.imageModelName, DEFAULT_SELLER_FLOW_SETTINGS.ai.imageModelName),
       imageApiKey: getString(ai.imageApiKey, DEFAULT_SELLER_FLOW_SETTINGS.ai.imageApiKey)
+    },
+    dataSharing: {
+      serverEnabled: getBoolean(
+        dataSharing.serverEnabled,
+        DEFAULT_SELLER_FLOW_SETTINGS.dataSharing.serverEnabled
+      ),
+      serverPort: Math.floor(
+        getNumber(dataSharing.serverPort, DEFAULT_SELLER_FLOW_SETTINGS.dataSharing.serverPort, 0)
+      ),
+      deviceId: dataSharingDeviceId || randomUUID(),
+      displayName: getString(
+        dataSharing.displayName,
+        DEFAULT_SELLER_FLOW_SETTINGS.dataSharing.displayName
+      )
     }
   }
 }

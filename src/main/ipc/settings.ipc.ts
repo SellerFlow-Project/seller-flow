@@ -3,14 +3,16 @@ import { getSettings, saveSettings, updateApplicationSettings } from '../service
 import { handleIpc } from './ipc-handler'
 import type { ApplicationSettings, SellerFlowSettings } from '../../shared/settings'
 import { crawlerService } from '../services/crawler.service'
+import { dataSharingService } from '../services/data-sharing.service'
 
 export function registerSettingsIPC(): void {
   handleIpc(IPC_CHANNEL.SETTINGS.GET, () => getSettings())
   handleIpc<[SellerFlowSettings], SellerFlowSettings>(
     IPC_CHANNEL.SETTINGS.SAVE,
-    (_event, settings) => {
+    async (_event, settings) => {
       const savedSettings = saveSettings(settings)
       crawlerService.applyCrawlingSettings(savedSettings.crawling)
+      await dataSharingService.applySettings(savedSettings.dataSharing)
       return savedSettings
     }
   )

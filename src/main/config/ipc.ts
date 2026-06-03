@@ -34,6 +34,15 @@ export const IPC_CHANNEL = {
     SAVE: 'settings:save',
     UPDATE_APPLICATION: 'settings:update-application'
   },
+  DATA_SHARING: {
+    GET_STATUS: 'data-sharing:get-status',
+    DISCOVER_SOURCES: 'data-sharing:discover-sources',
+    GET_REMOTE_TASKS: 'data-sharing:get-remote-tasks',
+    GET_REMOTE_CATEGORIES: 'data-sharing:get-remote-categories',
+    GET_REMOTE_SELLER_TYPES: 'data-sharing:get-remote-seller-types',
+    QUERY_REMOTE_PRODUCTS: 'data-sharing:query-remote-products',
+    GET_REMOTE_PRODUCT_BSR_RANKS: 'data-sharing:get-remote-product-bsr-ranks'
+  },
   ACCOUNT: {
     CHECK_SESSION: 'account:check-session',
     GET_CURRENT_USER: 'account:get-current-user',

@@ -14,6 +14,9 @@ import {
   Award
 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
+import type { SharedDataSource } from '../../../shared/data-sharing'
+
+const LOCAL_DATA_SOURCE_ID = 'local'
 
 // 采集任务接口定义
 interface CrawlTask {
@@ -57,12 +60,35 @@ interface CategoryNode {
 export const DataBrowsing: React.FC = () => {
   // 核心状态变量
   const activeTab = useAppStore((state) => state.activeTab)
-  const [selectedDataSource, setSelectedDataSource] = useState('local')
+  const [selectedDataSource, setSelectedDataSource] = useState(LOCAL_DATA_SOURCE_ID)
+  const [remoteDataSources, setRemoteDataSources] = useState<SharedDataSource[]>([])
   const [isSourceRefreshing, setIsSourceRefreshing] = useState(false)
+  const [dataSourceError, setDataSourceError] = useState('')
 
-  const handleRefreshSource = () => {
+  const selectedRemoteDataSource = useMemo(
+    () => remoteDataSources.find((source) => source.id === selectedDataSource) || null,
+    [remoteDataSources, selectedDataSource]
+  )
+  const isLocalDataSource = selectedDataSource === LOCAL_DATA_SOURCE_ID
+
+  const handleRefreshSource = async (): Promise<void> => {
     setIsSourceRefreshing(true)
-    setTimeout(() => setIsSourceRefreshing(false), 850)
+    setDataSourceError('')
+
+    try {
+      const sources = await window.api.dataSharing.discoverSources()
+      setRemoteDataSources(sources)
+      if (
+        selectedDataSource !== LOCAL_DATA_SOURCE_ID &&
+        !sources.some((s) => s.id === selectedDataSource)
+      ) {
+        setSelectedDataSource(LOCAL_DATA_SOURCE_ID)
+      }
+    } catch (error) {
+      setDataSourceError(error instanceof Error ? error.message : '扫描局域网数据源失败。')
+    } finally {
+      setIsSourceRefreshing(false)
+    }
   }
 
   const [tasks, setTasks] = useState<CrawlTask[]>([])
@@ -103,12 +129,23 @@ export const DataBrowsing: React.FC = () => {
     const fetchBsrRanks = async () => {
       setIsLoadingBsr(true)
       try {
-        const res = await window.electron.ipcRenderer.invoke(
-          'db:get-product-bsr-ranks',
-          activeProductDetail.id
-        )
-        if (res.success && res.list) {
-          setBsrRanks(res.list)
+        if (isLocalDataSource) {
+          const res = await window.electron.ipcRenderer.invoke(
+            'db:get-product-bsr-ranks',
+            activeProductDetail.id
+          )
+          if (res.success && res.list) {
+            setBsrRanks(res.list)
+          } else {
+            setBsrRanks([])
+          }
+        } else if (selectedRemoteDataSource) {
+          setBsrRanks(
+            await window.api.dataSharing.getRemoteProductBsrRanks(
+              selectedRemoteDataSource,
+              activeProductDetail.id
+            )
+          )
         } else {
           setBsrRanks([])
         }
@@ -121,7 +158,7 @@ export const DataBrowsing: React.FC = () => {
     }
 
     fetchBsrRanks()
-  }, [activeProductDetail])
+  }, [activeProductDetail, isLocalDataSource, selectedRemoteDataSource])
 
   // 💡 刷新全部任务相关的数据（当前选中的任务数据、商品数、分类、配送方式、列表等）
   const handleRefreshAll = async () => {
@@ -140,20 +177,27 @@ export const DataBrowsing: React.FC = () => {
   const fetchTasks = async (keepSelection = false) => {
     setIsLoadingTasks(true)
     try {
-      const res = await window.electron.ipcRenderer.invoke('db:get-tasks')
-      if (res.success && res.list) {
-        setTasks(res.list)
-        if (res.list.length > 0) {
-          const exists = res.list.some((task) => task.id === selectedTaskId)
-          if (!keepSelection || !selectedTaskId || !exists) {
-            setSelectedTaskId(res.list[0].id)
-          }
-        } else {
-          setSelectedTaskId('')
+      const list = isLocalDataSource
+        ? await window.electron.ipcRenderer
+            .invoke('db:get-tasks')
+            .then((res) => (res.success && res.list ? (res.list as CrawlTask[]) : []))
+        : selectedRemoteDataSource
+          ? ((await window.api.dataSharing.getRemoteTasks(selectedRemoteDataSource)) as CrawlTask[])
+          : []
+
+      setTasks(list)
+      if (list.length > 0) {
+        const exists = list.some((task) => task.id === selectedTaskId)
+        if (!keepSelection || !selectedTaskId || !exists) {
+          setSelectedTaskId(list[0].id)
         }
+      } else {
+        setSelectedTaskId('')
       }
     } catch (err) {
       console.error('[DataBrowsing] 获取采集任务列表失败:', err)
+      setTasks([])
+      setSelectedTaskId('')
     } finally {
       setIsLoadingTasks(false)
     }
@@ -166,12 +210,37 @@ export const DataBrowsing: React.FC = () => {
     }
   }, [activeTab])
 
+  useEffect(() => {
+    setSelectedTaskId('')
+    setTasks([])
+    setCategories([])
+    setSelectedLevels([])
+    setSellerTypes([])
+    setSelectedSellerType('')
+    setProducts([])
+    setTotalCount(0)
+    setActiveProductDetail(null)
+    setBsrRanks([])
+    setCurrentPage(1)
+    if (activeTab === 'data-browsing') {
+      void fetchTasks()
+    }
+  }, [selectedDataSource, activeTab])
+
   // 核心获取状态的异步函数
   const fetchCategories = async (taskId: number) => {
     try {
-      const res = await window.electron.ipcRenderer.invoke('db:get-categories', taskId)
-      if (res.success && res.list) {
-        setCategories(res.list)
+      if (isLocalDataSource) {
+        const res = await window.electron.ipcRenderer.invoke('db:get-categories', taskId)
+        if (res.success && res.list) {
+          setCategories(res.list)
+        } else {
+          setCategories([])
+        }
+      } else if (selectedRemoteDataSource) {
+        setCategories(
+          await window.api.dataSharing.getRemoteCategories(selectedRemoteDataSource, taskId)
+        )
       } else {
         setCategories([])
       }
@@ -183,9 +252,17 @@ export const DataBrowsing: React.FC = () => {
 
   const fetchSellerTypes = async (taskId: number) => {
     try {
-      const res = await window.electron.ipcRenderer.invoke('db:get-seller-types', taskId)
-      if (res.success && res.list) {
-        setSellerTypes(res.list)
+      if (isLocalDataSource) {
+        const res = await window.electron.ipcRenderer.invoke('db:get-seller-types', taskId)
+        if (res.success && res.list) {
+          setSellerTypes(res.list)
+        } else {
+          setSellerTypes([])
+        }
+      } else if (selectedRemoteDataSource) {
+        setSellerTypes(
+          await window.api.dataSharing.getRemoteSellerTypes(selectedRemoteDataSource, taskId)
+        )
       } else {
         setSellerTypes([])
       }
@@ -212,7 +289,7 @@ export const DataBrowsing: React.FC = () => {
     setCurrentPage(1) // 重置分页
     fetchCategories(selectedTaskId)
     fetchSellerTypes(selectedTaskId)
-  }, [selectedTaskId])
+  }, [selectedTaskId, selectedDataSource])
 
   // 3. 构建多级分类层级字典树
   const categoryTree = useMemo(() => {
@@ -264,7 +341,7 @@ export const DataBrowsing: React.FC = () => {
     const offset = (currentPage - 1) * pageSize
 
     try {
-      const res = await window.electron.ipcRenderer.invoke('db:query-products', {
+      const filter = {
         taskId: selectedTaskId,
         query: searchQuery.trim() || undefined,
         category: activeCategoryPath,
@@ -273,7 +350,18 @@ export const DataBrowsing: React.FC = () => {
         sortOrder,
         limit: pageSize,
         offset
-      })
+      }
+      const res = isLocalDataSource
+        ? await window.electron.ipcRenderer.invoke('db:query-products', filter)
+        : selectedRemoteDataSource
+          ? {
+              success: true,
+              ...(await window.api.dataSharing.queryRemoteProducts(
+                selectedRemoteDataSource,
+                filter
+              ))
+            }
+          : { success: false }
 
       if (res.success) {
         setProducts(res.list || [])
@@ -301,7 +389,8 @@ export const DataBrowsing: React.FC = () => {
     selectedSellerType,
     sortBy,
     sortOrder,
-    currentPage
+    currentPage,
+    selectedDataSource
   ])
 
   // 重置所有筛选条件
@@ -476,7 +565,11 @@ export const DataBrowsing: React.FC = () => {
                 className="w-full bg-background border border-border rounded-md px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-semibold"
               >
                 <option value="local">本地数据</option>
-                <option value="lan-shared">局域网共享数据</option>
+                {remoteDataSources.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.name} ({source.host}:{source.port})
+                  </option>
+                ))}
               </select>
               <button
                 type="button"
@@ -485,9 +578,15 @@ export const DataBrowsing: React.FC = () => {
                 className="p-2 border border-border rounded-md bg-card hover:bg-slate-100 dark:hover:bg-zinc-900 text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-50"
                 title="刷新数据源"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSourceRefreshing ? 'animate-spin text-primary' : ''}`} />
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${isSourceRefreshing ? 'animate-spin text-primary' : ''}`}
+                />
               </button>
             </div>
+
+            {dataSourceError && (
+              <div className="text-xs font-semibold text-rose-500">{dataSourceError}</div>
+            )}
 
             <div className="flex items-center space-x-2 shrink-0">
               <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
