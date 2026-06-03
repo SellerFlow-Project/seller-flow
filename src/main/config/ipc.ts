@@ -14,6 +14,7 @@ export const IPC_CHANNEL = {
     DELETE_TASK: 'db:delete-task',
     QUERY_PRODUCTS: 'db:query-products',
     GET_PRODUCT_BSR_RANKS: 'db:get-product-bsr-ranks',
+    MARK_PRODUCT_READ: 'db:mark-product-read',
     DELETE_PRODUCTS: 'db:delete-products',
     GET_STATISTICS: 'db:get-statistics',
     GET_SPRITE_ACCOUNTS: 'db:get-sprite-accounts',
@@ -41,7 +42,8 @@ export const IPC_CHANNEL = {
     GET_REMOTE_CATEGORIES: 'data-sharing:get-remote-categories',
     GET_REMOTE_SELLER_TYPES: 'data-sharing:get-remote-seller-types',
     QUERY_REMOTE_PRODUCTS: 'data-sharing:query-remote-products',
-    GET_REMOTE_PRODUCT_BSR_RANKS: 'data-sharing:get-remote-product-bsr-ranks'
+    GET_REMOTE_PRODUCT_BSR_RANKS: 'data-sharing:get-remote-product-bsr-ranks',
+    MARK_REMOTE_PRODUCT_READ: 'data-sharing:mark-remote-product-read'
   },
   ACCOUNT: {
     CHECK_SESSION: 'account:check-session',

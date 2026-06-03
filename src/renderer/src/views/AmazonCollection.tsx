@@ -74,6 +74,147 @@ const EMPTY_DELIVERY_DETAIL_QUEUE: DeliveryDetailQueueItem[] = Array.from(
   })
 )
 
+interface AdjustableAmazonCategory {
+  name: string
+  href: string
+  enabled: boolean
+}
+
+interface AmazonCategoryPreference extends AdjustableAmazonCategory {
+  order: number
+}
+
+type AmazonCategoryPreferenceStore = Record<string, AmazonCategoryPreference[]>
+
+const AMAZON_CATEGORY_PREFERENCE_STORAGE_KEY = 'sellerflow.amazon.category-preferences.v1'
+
+function buildCategoryPreferenceKey(
+  taskType: CrawlTaskType,
+  marketplace: AmazonMarketplace
+): string {
+  return `${taskType}:${marketplace}`
+}
+
+function normalizeCategoryValue(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function isCategoryPreference(value: unknown): value is AmazonCategoryPreference {
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Partial<AmazonCategoryPreference>
+  return (
+    typeof candidate.name === 'string' &&
+    typeof candidate.href === 'string' &&
+    typeof candidate.enabled === 'boolean' &&
+    typeof candidate.order === 'number'
+  )
+}
+
+function readCategoryPreferenceStore(): AmazonCategoryPreferenceStore {
+  try {
+    const raw = window.localStorage.getItem(AMAZON_CATEGORY_PREFERENCE_STORAGE_KEY)
+    if (!raw) return {}
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+
+    return Object.entries(parsed as Record<string, unknown>).reduce<AmazonCategoryPreferenceStore>(
+      (acc, [key, value]) => {
+        if (Array.isArray(value)) {
+          acc[key] = value.filter(isCategoryPreference)
+        }
+        return acc
+      },
+      {}
+    )
+  } catch (error) {
+    console.error('[AmazonCollection] 读取分类偏好失败:', error)
+    return {}
+  }
+}
+
+function loadCategoryPreferences(
+  taskType: CrawlTaskType,
+  marketplace: AmazonMarketplace
+): AmazonCategoryPreference[] {
+  const store = readCategoryPreferenceStore()
+  return store[buildCategoryPreferenceKey(taskType, marketplace)] ?? []
+}
+
+function saveCategoryPreferences(
+  taskType: CrawlTaskType,
+  marketplace: AmazonMarketplace,
+  categories: AdjustableAmazonCategory[]
+): void {
+  try {
+    const key = buildCategoryPreferenceKey(taskType, marketplace)
+    const store = readCategoryPreferenceStore()
+    store[key] = categories.map((category, index) => ({
+      name: category.name,
+      href: category.href,
+      enabled: category.enabled,
+      order: index
+    }))
+    window.localStorage.setItem(AMAZON_CATEGORY_PREFERENCE_STORAGE_KEY, JSON.stringify(store))
+  } catch (error) {
+    console.error('[AmazonCollection] 保存分类偏好失败:', error)
+  }
+}
+
+function findCategoryPreference(
+  category: AdjustableAmazonCategory,
+  preferences: AmazonCategoryPreference[]
+): AmazonCategoryPreference | undefined {
+  const categoryHref = normalizeCategoryValue(category.href)
+  const categoryName = normalizeCategoryValue(category.name)
+
+  return preferences.find((preference) => {
+    const preferenceHref = normalizeCategoryValue(preference.href)
+    const preferenceName = normalizeCategoryValue(preference.name)
+    return (
+      (categoryHref.length > 0 && preferenceHref === categoryHref) ||
+      (categoryName.length > 0 && preferenceName === categoryName)
+    )
+  })
+}
+
+function mergeLiveCategoriesWithPreferences(
+  liveCategories: AdjustableAmazonCategory[],
+  preferences: AmazonCategoryPreference[]
+): AdjustableAmazonCategory[] {
+  return liveCategories
+    .map((category, liveIndex) => {
+      const preference = findCategoryPreference(category, preferences)
+      return {
+        category: {
+          ...category,
+          enabled: preference?.enabled ?? true
+        },
+        liveIndex,
+        preferenceOrder: preference?.order
+      }
+    })
+    .sort((left, right) => {
+      const leftHasPreference = typeof left.preferenceOrder === 'number'
+      const rightHasPreference = typeof right.preferenceOrder === 'number'
+
+      if (leftHasPreference && rightHasPreference) {
+        return (
+          (left.preferenceOrder ?? 0) - (right.preferenceOrder ?? 0) ||
+          left.liveIndex - right.liveIndex
+        )
+      }
+
+      if (leftHasPreference !== rightHasPreference) {
+        return leftHasPreference ? -1 : 1
+      }
+
+      return left.liveIndex - right.liveIndex
+    })
+    .map((item) => item.category)
+}
+
 export const AmazonCollection: React.FC = () => {
   // Use state variables typed from the crawler module to verify Keep-Alive state persistence
   const [taskType, setTaskType] = useState<CrawlTaskType>(CrawlTaskType.BEST_SELLERS)
@@ -99,12 +240,9 @@ export const AmazonCollection: React.FC = () => {
   const [isFetchingCats, setIsFetchingCats] = useState(false)
   const [showAdjustModal, setShowAdjustModal] = useState(false)
   const [preparedTaskType, setPreparedTaskType] = useState<CrawlTaskType | null>(null)
-  const [tempCategories, setTempCategories] = useState<
-    { name: string; href: string; enabled: boolean }[]
-  >([])
-  const [originalCategories, setOriginalCategories] = useState<
-    { name: string; href: string; enabled: boolean }[]
-  >([])
+  const [preparedMarketplace, setPreparedMarketplace] = useState<AmazonMarketplace | null>(null)
+  const [tempCategories, setTempCategories] = useState<AdjustableAmazonCategory[]>([])
+  const [originalCategories, setOriginalCategories] = useState<AdjustableAmazonCategory[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
 
   const [deliveryDetail, setDeliveryDetail] = useState<DeliveryDetailState>(
@@ -218,17 +356,19 @@ export const AmazonCollection: React.FC = () => {
    */
   const startCrawl = async () => {
     const requestedTaskType = taskType
+    const requestedMarketplace = marketplace
     setIsFetchingCats(true)
     setPreparedTaskType(null)
+    setPreparedMarketplace(null)
     setLogs((prev) => [
       ...prev,
-      `[系统] 正在准备开启 ${MarketplaceConfigs[marketplace].name} ${CrawlTaskTypeNames[requestedTaskType]}...`
+      `[系统] 正在准备开启 ${MarketplaceConfigs[requestedMarketplace].name} ${CrawlTaskTypeNames[requestedTaskType]}...`
     ])
     setLogs((prev) => [...prev, '[系统] 正在动态获取 Cookie 凭证并尝试抓取排行榜顶级分类数据...'])
 
     try {
       const res = await window.electron.ipcRenderer.invoke('crawler:get-amazon-cookies', {
-        marketplace,
+        marketplace: requestedMarketplace,
         taskType: requestedTaskType
       })
 
@@ -240,19 +380,23 @@ export const AmazonCollection: React.FC = () => {
         throw new Error('未能在该站点排行榜页面解析到任何顶级分类')
       }
 
-      const formattedCats = res.categories.map((c: any) => ({
+      const formattedCats: AdjustableAmazonCategory[] = res.categories.map((c: any) => ({
         name: c.name,
         href: c.href,
         enabled: true
       }))
+      const savedPreferences = loadCategoryPreferences(requestedTaskType, requestedMarketplace)
+      const mergedCats = mergeLiveCategoriesWithPreferences(formattedCats, savedPreferences)
 
       setOriginalCategories(JSON.parse(JSON.stringify(formattedCats)))
-      setTempCategories(formattedCats)
+      setTempCategories(mergedCats)
       setPreparedTaskType(requestedTaskType)
+      setPreparedMarketplace(requestedMarketplace)
+      saveCategoryPreferences(requestedTaskType, requestedMarketplace, mergedCats)
       setShowAdjustModal(true)
       setLogs((prev) => [
         ...prev,
-        `[成功] 成功抓取到 ${res.categories.length} 个顶层分类目录，已打开自定义调整弹窗。`
+        `[成功] 成功抓取到 ${res.categories.length} 个顶层分类目录，已按本地记忆合并排序和启用状态。`
       ])
     } catch (err: any) {
       const errMsg = err.message || '未知错误'
@@ -282,7 +426,7 @@ export const AmazonCollection: React.FC = () => {
   }
 
   const confirmAndStartCrawl = async () => {
-    if (!preparedTaskType) {
+    if (!preparedTaskType || !preparedMarketplace) {
       alert('排行榜任务尚未准备完成，请重新获取分类。')
       return
     }
@@ -296,6 +440,7 @@ export const AmazonCollection: React.FC = () => {
       return
     }
 
+    saveCategoryPreferences(preparedTaskType, preparedMarketplace, tempCategories)
     setShowAdjustModal(false)
     setIsCrawling(true)
     setIsStopping(false)
@@ -316,7 +461,7 @@ export const AmazonCollection: React.FC = () => {
     try {
       const res = await window.electron.ipcRenderer.invoke('crawler:start-task', {
         taskType: preparedTaskType,
-        marketplace,
+        marketplace: preparedMarketplace,
         crawlStrategy,
         selectedCategories // 传递过滤并排序后的首级分类列表
       })
@@ -348,6 +493,7 @@ export const AmazonCollection: React.FC = () => {
   const cancelCrawlPreparation = () => {
     setShowAdjustModal(false)
     setPreparedTaskType(null)
+    setPreparedMarketplace(null)
     setLogs((prev) => [...prev, '[系统] 用户取消了分类调整，采集任务已终止。'])
   }
 
@@ -581,7 +727,7 @@ export const AmazonCollection: React.FC = () => {
                 <select
                   value={marketplace}
                   onChange={(e) => setMarketplace(e.target.value as AmazonMarketplace)}
-                  disabled={isCrawling}
+                  disabled={isCrawling || isFetchingCats || showAdjustModal}
                   className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all-200 cursor-pointer"
                 >
                   {Object.values(AmazonMarketplace).map((m) => (

@@ -131,6 +131,10 @@ class DatabaseService {
       {
         name: 'has_delivery_detail',
         sql: `ALTER TABLE crawled_products ADD COLUMN has_delivery_detail INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE}`
+      },
+      {
+        name: 'is_read',
+        sql: `ALTER TABLE crawled_products ADD COLUMN is_read INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE}`
       }
     ]
 
@@ -143,6 +147,7 @@ class DatabaseService {
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_products_sellersprite_flag ON crawled_products(has_sellersprite_data);
       CREATE INDEX IF NOT EXISTS idx_products_delivery_detail_flag ON crawled_products(task_id, has_delivery_detail);
+      CREATE INDEX IF NOT EXISTS idx_products_read_flag ON crawled_products(task_id, is_read);
 
       CREATE TABLE IF NOT EXISTS product_bsr_ranks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -385,6 +390,17 @@ class DatabaseService {
     return transaction(updates)
   }
 
+  public markProductAsRead(productId: number): boolean {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      UPDATE crawled_products
+      SET is_read = ?
+      WHERE id = ?
+    `)
+    const result = stmt.run(SQLITE_BOOLEAN.TRUE, productId)
+    return result.changes > 0
+  }
+
   /**
    * 获取所有采集任务列表 (排序以最新创建的优先)
    */
@@ -498,17 +514,25 @@ class DatabaseService {
       ? requestedSortBy
       : PRODUCT_QUERY_DEFAULT.SORT_BY
     const sortOrder =
-      filter?.sortOrder === PRODUCT_SORT_ORDER.DESC
-        ? PRODUCT_SORT_ORDER.DESC
+      filter?.sortOrder === PRODUCT_SORT_ORDER.ASC || filter?.sortOrder === PRODUCT_SORT_ORDER.DESC
+        ? filter.sortOrder
         : PRODUCT_QUERY_DEFAULT.SORT_ORDER
     const limit = filter?.limit ?? PRODUCT_QUERY_DEFAULT.LIMIT
     const offset = filter?.offset ?? PRODUCT_QUERY_DEFAULT.OFFSET
+    const orderBy =
+      sortBy === 'sellersprite_available'
+        ? `CASE
+            WHEN sellersprite_available IS NULL OR sellersprite_available < 1000000000000 THEN 1
+            ELSE 0
+          END ASC,
+          sellersprite_available ${sortOrder}`
+        : `${sortBy} ${sortOrder}`
 
     // better-sqlite3 预编译参数防 SQL 注入
     const querySql = `
       SELECT * FROM crawled_products
       ${whereStr}
-      ORDER BY ${sortBy} ${sortOrder}
+      ORDER BY ${orderBy}
       LIMIT ? OFFSET ?
     `
     const listParams = [...params, limit, offset]

@@ -239,6 +239,24 @@ class DataSharingService {
     return response.list || []
   }
 
+  public async markRemoteProductAsRead(
+    source: SharedDataSource,
+    productId: number
+  ): Promise<boolean> {
+    const response = await fetchJson<{ success: boolean; updated?: boolean; error?: string }>(
+      `${normalizeRemoteBaseUrl(source)}/products/${productId}/read`,
+      {
+        method: 'PATCH'
+      }
+    )
+
+    if (!response.success) {
+      throw new Error(response.error || '远端商品已读状态更新失败。')
+    }
+
+    return Boolean(response.updated)
+  }
+
   private ensureSettings(): DataSharingSettings {
     if (this.settings) {
       return this.settings
@@ -358,6 +376,17 @@ class DataSharingService {
         res.json({
           success: true,
           list: databaseService.queryProductBsrRanks(toNumber(req.params.productId, 0))
+        })
+      } catch (error) {
+        sendJsonError(res, error)
+      }
+    })
+
+    api.patch(`${DATA_SHARING_API_PREFIX}/products/:productId/read`, (req, res) => {
+      try {
+        res.json({
+          success: true,
+          updated: databaseService.markProductAsRead(toNumber(req.params.productId, 0))
         })
       } catch (error) {
         sendJsonError(res, error)

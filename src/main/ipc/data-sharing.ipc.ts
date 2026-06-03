@@ -26,4 +26,8 @@ export function registerDataSharingIPC(): void {
     IPC_CHANNEL.DATA_SHARING.GET_REMOTE_PRODUCT_BSR_RANKS,
     (_event, source, productId) => dataSharingService.getRemoteProductBsrRanks(source, productId)
   )
+  handleIpc<[SharedDataSource, number], boolean>(
+    IPC_CHANNEL.DATA_SHARING.MARK_REMOTE_PRODUCT_READ,
+    (_event, source, productId) => dataSharingService.markRemoteProductAsRead(source, productId)
+  )
 }

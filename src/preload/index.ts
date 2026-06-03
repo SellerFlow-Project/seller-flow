@@ -155,7 +155,9 @@ const dataSharing: DataSharingApi = {
   queryRemoteProducts: (source, filter) =>
     invokeAccount('data-sharing:query-remote-products', [source, filter]),
   getRemoteProductBsrRanks: (source, productId) =>
-    invokeAccount('data-sharing:get-remote-product-bsr-ranks', [source, productId])
+    invokeAccount('data-sharing:get-remote-product-bsr-ranks', [source, productId]),
+  markRemoteProductAsRead: (source, productId) =>
+    invokeAccount('data-sharing:mark-remote-product-read', [source, productId])
 }
 
 const api = {

@@ -50,6 +50,7 @@ export interface DataSharingApi {
     filter: DataSharingProductQueryFilter
   ) => Promise<{ total: number; list: unknown[] }>
   getRemoteProductBsrRanks: (source: SharedDataSource, productId: number) => Promise<unknown[]>
+  markRemoteProductAsRead: (source: SharedDataSource, productId: number) => Promise<boolean>
 }
 
 export function isSharedDataSource(value: unknown): value is SharedDataSource {

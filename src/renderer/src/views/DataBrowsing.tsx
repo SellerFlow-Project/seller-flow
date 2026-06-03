@@ -47,6 +47,7 @@ interface CrawledProduct {
   sellersprite_available?: number | null
   delivery_days?: string | null
   has_delivery_detail: 0 | 1
+  is_read: 0 | 1
   crawled_at: string
 }
 
@@ -100,12 +101,12 @@ export const DataBrowsing: React.FC = () => {
 
   // 过滤与排序
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<string>('rank') // 默认按照排名排序
-  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('ASC')
+  const [sortBy, setSortBy] = useState<string>('crawled_at')
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC')
 
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize] = useState(20) // 💡 用户要求一页显示20条
+  const [pageSize] = useState(40)
   const [totalCount, setTotalCount] = useState(0)
   const [products, setProducts] = useState<CrawledProduct[]>([])
 
@@ -398,9 +399,26 @@ export const DataBrowsing: React.FC = () => {
     setSearchQuery('')
     setSelectedLevels([])
     setSelectedSellerType('')
-    setSortBy('rank')
-    setSortOrder('ASC')
+    setSortBy('crawled_at')
+    setSortOrder('DESC')
     setCurrentPage(1)
+  }
+
+  const handleOpenProductDetail = async (product: CrawledProduct): Promise<void> => {
+    setActiveProductDetail({ ...product, is_read: 1 })
+    setProducts((currentProducts) =>
+      currentProducts.map((item) => (item.id === product.id ? { ...item, is_read: 1 } : item))
+    )
+
+    try {
+      if (isLocalDataSource) {
+        await window.electron.ipcRenderer.invoke('db:mark-product-read', product.id)
+      } else if (selectedRemoteDataSource) {
+        await window.api.dataSharing.markRemoteProductAsRead(selectedRemoteDataSource, product.id)
+      }
+    } catch (error) {
+      console.error('[DataBrowsing] 更新商品已读状态失败:', error)
+    }
   }
 
   // 分类选择处理器
@@ -771,8 +789,8 @@ export const DataBrowsing: React.FC = () => {
                   }}
                   className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200"
                 >
-                  <option value="rank">排行榜名次</option>
                   <option value="price_amount">销售价格</option>
+                  <option value="sellersprite_available">上架时间</option>
                   <option value="crawled_at">采集入库时间</option>
                   <option value="id">物理自增 ID</option>
                 </select>
@@ -840,7 +858,11 @@ export const DataBrowsing: React.FC = () => {
                     products.map((p) => (
                       <tr
                         key={p.id}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors duration-150"
+                        className={`transition-colors duration-150 ${
+                          p.is_read
+                            ? 'bg-primary/5 hover:bg-primary/10 dark:bg-primary/10 dark:hover:bg-primary/15'
+                            : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/20'
+                        }`}
                       >
                         {/* 1. 💡 缩略图显示 (合理大小 w-12 h-12，圆角，支持悬停轻微放大) */}
                         <td className="py-3 px-4 text-center">
@@ -871,7 +893,7 @@ export const DataBrowsing: React.FC = () => {
                           title={p.title}
                         >
                           <button
-                            onClick={() => setActiveProductDetail(p)}
+                            onClick={() => void handleOpenProductDetail(p)}
                             className="hover:underline hover:text-primary text-left font-medium block truncate w-full"
                           >
                             {p.title}

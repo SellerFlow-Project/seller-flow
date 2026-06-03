@@ -18,9 +18,9 @@ export const SQLITE_BOOLEAN = {
 } as const
 
 export const PRODUCT_QUERY_DEFAULT = {
-  SORT_BY: 'id',
-  SORT_ORDER: 'ASC',
-  LIMIT: 50,
+  SORT_BY: 'crawled_at',
+  SORT_ORDER: 'DESC',
+  LIMIT: 40,
   OFFSET: 0
 } as const
 
@@ -66,6 +66,7 @@ export const PRODUCT_SORT_COLUMNS = new Set([
   'has_sellersprite_data',
   'delivery_days',
   'has_delivery_detail',
+  'is_read',
   'crawled_at'
 ])
 
@@ -98,6 +99,7 @@ export const DATABASE_SCHEMA_SQL = `
     has_sellersprite_data INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(has_sellersprite_data IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
     delivery_days TEXT,
     has_delivery_detail INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(has_delivery_detail IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
+    is_read INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(is_read IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
     crawled_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
     UNIQUE(task_id, asin)
@@ -106,8 +108,6 @@ export const DATABASE_SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_products_task_id ON crawled_products(task_id);
   CREATE INDEX IF NOT EXISTS idx_products_asin ON crawled_products(asin);
   CREATE INDEX IF NOT EXISTS idx_products_price_rank ON crawled_products(price_amount, rank);
-  CREATE INDEX IF NOT EXISTS idx_products_sellersprite_flag ON crawled_products(has_sellersprite_data);
-  CREATE INDEX IF NOT EXISTS idx_products_delivery_detail_flag ON crawled_products(task_id, has_delivery_detail);
 
   CREATE TABLE IF NOT EXISTS product_bsr_ranks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -60,6 +60,10 @@ export function registerDatabaseIPC(): void {
     return createIpcSuccess({ list: databaseService.queryProductBsrRanks(productId) })
   })
 
+  handleIpc(IPC_CHANNEL.DATABASE.MARK_PRODUCT_READ, (_event, productId: number) => {
+    return createIpcSuccess({ updated: databaseService.markProductAsRead(productId) })
+  })
+
   // 兼容性保留：删除商品记录 (如果有 taskId 则调用级联任务删除)
   handleIpc(
     IPC_CHANNEL.DATABASE.DELETE_PRODUCTS,

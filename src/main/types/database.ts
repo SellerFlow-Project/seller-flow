@@ -89,6 +89,7 @@ export interface CrawledProductRow {
   has_sellersprite_data: SqliteBoolean
   delivery_days?: string | null
   has_delivery_detail: SqliteBoolean
+  is_read: SqliteBoolean
   crawled_at: string
 }
 
