@@ -8,6 +8,13 @@ import {
 } from '../../../shared/settings'
 import { DEFAULT_TAB, INITIAL_EXPANDED_MENUS, PARENT_MENU_BY_TAB } from '../config/tabs'
 import type { TabKey } from '../config/tabs'
+import {
+  getPermissionsForRoles,
+  hasPermission as userHasPermission,
+  type AccountPermission,
+  type AccountUser,
+  type AuthStage
+} from '../../../shared/account'
 
 export type { TabKey } from '../config/tabs'
 export type { ThemeColor, ThemeMode, UiScaleMode } from '../../../shared/settings'
@@ -18,6 +25,9 @@ interface AppState {
   theme: ThemeMode
   themeColor: ThemeColor
   uiScale: UiScaleMode
+  authStage: AuthStage
+  currentUser: AccountUser | null
+  permissions: AccountPermission[]
   setTab: (tab: TabKey) => void
   toggleMenu: (menuKey: string) => void
   applyApplicationSettings: (settings: ApplicationSettings) => void
@@ -25,6 +35,10 @@ interface AppState {
   toggleTheme: () => void
   setUiScale: (scale: UiScaleMode) => void
   setThemeColor: (themeColor: ThemeColor) => void
+  setAuthStage: (stage: AuthStage) => void
+  setAuthenticatedUser: (user: AccountUser) => void
+  clearAuthenticatedUser: () => void
+  hasPermission: (permission: AccountPermission) => boolean
 }
 
 const THEME_COLORS: Record<ThemeColor, string> = {
@@ -53,6 +67,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   theme: DEFAULT_SELLER_FLOW_SETTINGS.application.theme,
   themeColor: DEFAULT_SELLER_FLOW_SETTINGS.application.themeColor,
   uiScale: DEFAULT_SELLER_FLOW_SETTINGS.application.uiScale,
+  authStage: 'splash',
+  currentUser: null,
+  permissions: [],
+
+  setAuthStage: (stage) => set({ authStage: stage }),
+
+  setAuthenticatedUser: (user) =>
+    set({
+      currentUser: user,
+      permissions: getPermissionsForRoles(user.roles),
+      authStage: 'main'
+    }),
+
+  clearAuthenticatedUser: () =>
+    set({
+      currentUser: null,
+      permissions: [],
+      authStage: 'login',
+      activeTab: DEFAULT_TAB
+    }),
+
+  hasPermission: (permission) => userHasPermission(get().currentUser, permission),
 
   setTab: (tab) =>
     set((state) => {

@@ -7,7 +7,8 @@ export const TAB_KEYS = [
   'data-deletion',
   'ai-functions',
   'seller-sprite',
-  'settings'
+  'settings',
+  'account-admin'
 ] as const
 
 export type TabKey = (typeof TAB_KEYS)[number]

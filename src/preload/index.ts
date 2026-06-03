@@ -7,6 +7,15 @@ import {
   type SellerFlowSettings,
   type SettingsApi
 } from '../shared/settings'
+import {
+  isAccountSession,
+  isAccountUser,
+  isAuditLog,
+  isCreatedRegistrationCode,
+  isRegistrationCode,
+  isSessionCheckResult,
+  type AccountApi
+} from '../shared/account'
 import type { AppUpdateApi, AppUpdateState } from '../shared/update'
 
 // Custom APIs for renderer
@@ -69,7 +78,63 @@ const settings: SettingsApi = {
     invokeSettings('settings:update-application', [nextSettings], isApplicationSettings)
 }
 
+async function invokeAccount<T>(
+  channel: string,
+  args: unknown[],
+  validator?: (value: unknown) => value is T
+): Promise<T> {
+  const response: unknown = await ipcRenderer.invoke(channel, ...args)
+  const errorMessage = getIpcErrorMessage(response)
+
+  if (errorMessage) {
+    throw new Error(errorMessage)
+  }
+
+  if (validator && !validator(response)) {
+    throw new Error('主进程返回了不完整的账号数据。')
+  }
+
+  return response as T
+}
+
+const account: AccountApi = {
+  checkSession: () => invokeAccount('account:check-session', [], isSessionCheckResult),
+  getCurrentUser: () => invokeAccount('account:get-current-user', [], isAccountUser),
+  login: (payload) => invokeAccount('account:login', [payload], isAccountSession),
+  register: (payload) => invokeAccount('account:register', [payload], isAccountSession),
+  logout: (allDevices) => invokeAccount('account:logout', [allDevices]),
+  changePassword: (payload) => invokeAccount('account:change-password', [payload]),
+  listRegistrationCodes: () =>
+    invokeAccount(
+      'account:list-registration-codes',
+      [],
+      (value): value is Awaited<ReturnType<AccountApi['listRegistrationCodes']>> =>
+        Array.isArray(value) && value.every(isRegistrationCode)
+    ),
+  createRegistrationCode: (payload) =>
+    invokeAccount('account:create-registration-code', [payload], isCreatedRegistrationCode),
+  revokeRegistrationCode: (id) => invokeAccount('account:revoke-registration-code', [id]),
+  listUsers: () =>
+    invokeAccount(
+      'account:list-users',
+      [],
+      (value): value is Awaited<ReturnType<AccountApi['listUsers']>> =>
+        Array.isArray(value) && value.every(isAccountUser)
+    ),
+  updateUserStatus: (id, status) => invokeAccount('account:update-user-status', [id, status]),
+  updateUserRoles: (id, roles) => invokeAccount('account:update-user-roles', [id, roles]),
+  revokeUserSessions: (id) => invokeAccount('account:revoke-user-sessions', [id]),
+  listAuditLogs: () =>
+    invokeAccount(
+      'account:list-audit-logs',
+      [],
+      (value): value is Awaited<ReturnType<AccountApi['listAuditLogs']>> =>
+        Array.isArray(value) && value.every(isAuditLog)
+    )
+}
+
 const api = {
+  account,
   settings,
   updates
 }

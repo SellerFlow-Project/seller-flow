@@ -100,8 +100,9 @@ export const SettingsView: React.FC = () => {
 
   // Setting sections tabs
   const [activeSection, setActiveSection] = useState<
-    'app' | 'notifications' | 'crawling' | 'ai' | 'about'
+    'app' | 'notifications' | 'crawling' | 'ai' | 'sharing' | 'about'
   >('app')
+  const [isServerEnabled, setIsServerEnabled] = useState(false)
   const [draftSettings, setDraftSettings] = useState<SellerFlowSettings>(() =>
     structuredClone(DEFAULT_SELLER_FLOW_SETTINGS)
   )
@@ -272,6 +273,18 @@ export const SettingsView: React.FC = () => {
             >
               <Brain className="w-4 h-4" />
               <span>AI大模型配置</span>
+            </button>
+
+            <button
+              onClick={() => setActiveSection('sharing')}
+              className={`w-full flex items-center space-x-2.5 px-3 py-2.5 rounded-md text-xs font-semibold transition-all ${
+                activeSection === 'sharing'
+                  ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-slate-100/50 dark:hover:bg-zinc-900/40'
+              }`}
+            >
+              <Server className="w-4 h-4" />
+              <span>数据共享配置</span>
             </button>
 
             <button
@@ -677,7 +690,28 @@ export const SettingsView: React.FC = () => {
               </div>
             )}
 
-            {/* --- 4. ABOUT WORKSTATION --- */}
+            {/* --- 5. DATA SHARING SETTINGS --- */}
+            {activeSection === 'sharing' && (
+              <div className="space-y-6 animate-fade-in">
+                <div className="pb-4 border-b border-border">
+                  <h3 className="text-base font-bold text-foreground">数据共享配置</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    配置当前客户端的局域网共享模式与联机浏览数据源权限
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-zinc-900/20 border border-border/80 rounded-xl px-4 py-1">
+                  <ToggleSwitch
+                    checked={isServerEnabled}
+                    onChange={setIsServerEnabled}
+                    label="将本机作为服务端"
+                    description="启用后，本机将作为服务器端，同局域网内的其它客户端可以扫描发现并连接到当前客户端，且其它客户端可以实时浏览本机已采集的所有数据。"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* --- 6. ABOUT WORKSTATION --- */}
             {activeSection === 'about' && (
               <div className="space-y-6 animate-fade-in">
                 <div className="pb-4 border-b border-border">
@@ -757,26 +791,28 @@ export const SettingsView: React.FC = () => {
           </div>
 
           {/* Persistent Floating Save Configuration Section (Pinned at the bottom right) */}
-          <div className="flex items-center justify-between pt-5 border-t border-border mt-6">
-            <div className="flex-1 flex items-center">
-              {saveSuccess && (
-                <div className="inline-flex items-center space-x-1.5 text-emerald-500 text-xs font-bold animate-fade-in">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>控制台配置更新应用成功！</span>
-                </div>
-              )}
-              {saveError && <span className="text-xs font-semibold text-red-500">{saveError}</span>}
-            </div>
+          {activeSection !== 'sharing' && (
+            <div className="flex items-center justify-between pt-5 border-t border-border mt-6">
+              <div className="flex-1 flex items-center">
+                {saveSuccess && (
+                  <div className="inline-flex items-center space-x-1.5 text-emerald-500 text-xs font-bold animate-fade-in">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>控制台配置更新应用成功！</span>
+                  </div>
+                )}
+                {saveError && <span className="text-xs font-semibold text-red-500">{saveError}</span>}
+              </div>
 
-            <button
-              onClick={() => void handleSave()}
-              disabled={isSaving}
-              className="inline-flex items-center justify-center space-x-2 bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-md hover:bg-primary/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>{isSaving ? '正在保存...' : '保存当前配置'}</span>
-            </button>
-          </div>
+              <button
+                onClick={() => void handleSave()}
+                disabled={isSaving}
+                className="inline-flex items-center justify-center space-x-2 bg-primary text-primary-foreground font-semibold px-6 py-2 rounded-md hover:bg-primary/95 transition-all duration-150 hover:-translate-y-[1px] active:translate-y-0 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>{isSaving ? '正在保存...' : '保存当前配置'}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

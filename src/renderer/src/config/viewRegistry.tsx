@@ -6,6 +6,7 @@ import { DataBrowsing } from '../views/DataBrowsing'
 import { DataDeletion } from '../views/DataDeletion'
 import { SellerSprite } from '../views/SellerSprite'
 import { SettingsView } from '../views/SettingsView'
+import { AccountAdminView } from '../views/AccountAdminView'
 import type { TabKey } from './tabs'
 
 export const TAB_VIEWS: Record<TabKey, ReactNode> = {
@@ -15,5 +16,6 @@ export const TAB_VIEWS: Record<TabKey, ReactNode> = {
   'data-deletion': <DataDeletion />,
   'ai-functions': <AIFunctions />,
   'seller-sprite': <SellerSprite />,
-  settings: <SettingsView />
+  settings: <SettingsView />,
+  'account-admin': <AccountAdminView />
 }

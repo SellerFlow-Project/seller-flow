@@ -1,3 +1,4 @@
+import { registerAccountIPC } from './account.ipc'
 import { registerDatabaseIPC } from './database.ipc'
 import { registerCrawlerIPC } from './crawler.ipc'
 import { registerSellerSpriteIPC } from './sellersprite.ipc'
@@ -9,10 +10,11 @@ import { registerUpdateIPC } from './update.ipc'
  * 用于完全解耦并模块化管理渲染进程发送过来的进程通信请求
  */
 export function registerAllIPC(): void {
+  registerAccountIPC()
   registerDatabaseIPC()
   registerCrawlerIPC()
   registerSellerSpriteIPC()
   registerSettingsIPC()
   registerUpdateIPC()
-  console.log('[IPC] 数据库、爬虫、卖家精灵、设置与更新服务的所有 IPC 消息管道注册完毕。')
+  console.log('[IPC] 账号、数据库、爬虫、卖家精灵、设置与更新服务的所有 IPC 消息管道注册完毕。')
 }

@@ -34,6 +34,22 @@ export const IPC_CHANNEL = {
     SAVE: 'settings:save',
     UPDATE_APPLICATION: 'settings:update-application'
   },
+  ACCOUNT: {
+    CHECK_SESSION: 'account:check-session',
+    GET_CURRENT_USER: 'account:get-current-user',
+    LOGIN: 'account:login',
+    REGISTER: 'account:register',
+    LOGOUT: 'account:logout',
+    CHANGE_PASSWORD: 'account:change-password',
+    LIST_REGISTRATION_CODES: 'account:list-registration-codes',
+    CREATE_REGISTRATION_CODE: 'account:create-registration-code',
+    REVOKE_REGISTRATION_CODE: 'account:revoke-registration-code',
+    LIST_USERS: 'account:list-users',
+    UPDATE_USER_STATUS: 'account:update-user-status',
+    UPDATE_USER_ROLES: 'account:update-user-roles',
+    REVOKE_USER_SESSIONS: 'account:revoke-user-sessions',
+    LIST_AUDIT_LOGS: 'account:list-audit-logs'
+  },
   UPDATE: {
     GET_STATE: 'update:get-state',
     CHECK: 'update:check',

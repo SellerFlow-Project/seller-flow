@@ -10,12 +10,15 @@ import {
   Trash2
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { AccountPermission, AccountUser } from '../../../shared/account'
+import { hasPermission } from '../../../shared/account'
 import type { TabKey } from './tabs'
 
 export interface SidebarChild {
   key: TabKey
   title: string
   icon: ReactNode
+  requiredPermission?: AccountPermission
 }
 
 export type SidebarItem =
@@ -24,6 +27,7 @@ export type SidebarItem =
       key: TabKey
       title: string
       icon: ReactNode
+      requiredPermission?: AccountPermission
     }
   | {
       type: 'group'
@@ -31,6 +35,7 @@ export type SidebarItem =
       title: string
       icon: ReactNode
       children: SidebarChild[]
+      requiredPermission?: AccountPermission
     }
 
 export const SIDEBAR_ITEMS: SidebarItem[] = [
@@ -38,7 +43,8 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     type: 'item',
     key: 'dashboard',
     title: '工作台',
-    icon: <LayoutGrid className="w-4 h-4 text-primary" />
+    icon: <LayoutGrid className="w-4 h-4 text-primary" />,
+    requiredPermission: 'dashboard:view'
   },
   {
     type: 'group',
@@ -49,7 +55,8 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
       {
         key: 'amazon-collection',
         title: '亚马逊采集',
-        icon: <Flame className="w-4 h-4 text-orange-500" />
+        icon: <Flame className="w-4 h-4 text-orange-500" />,
+        requiredPermission: 'crawler:amazon'
       }
     ]
   },
@@ -62,12 +69,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
       {
         key: 'data-browsing',
         title: '数据浏览',
-        icon: <Database className="w-4 h-4 text-blue-500" />
+        icon: <Database className="w-4 h-4 text-blue-500" />,
+        requiredPermission: 'data:browse'
       },
       {
         key: 'data-deletion',
         title: '数据删除',
-        icon: <Trash2 className="w-4 h-4 text-rose-500" />
+        icon: <Trash2 className="w-4 h-4 text-rose-500" />,
+        requiredPermission: 'data:delete'
       }
     ]
   },
@@ -75,23 +84,78 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     type: 'item',
     key: 'ai-functions',
     title: 'AI功能',
-    icon: <Bot className="w-4 h-4 text-indigo-500" />
+    icon: <Bot className="w-4 h-4 text-indigo-500" />,
+    requiredPermission: 'ai:use'
   },
   {
     type: 'item',
     key: 'seller-sprite',
     title: '卖家精灵',
-    icon: <Activity className="w-4 h-4 text-purple-500" />
+    icon: <Activity className="w-4 h-4 text-purple-500" />,
+    requiredPermission: 'sellersprite:manage'
   },
   {
     type: 'item',
     key: 'settings',
     title: '设置',
-    icon: <Settings className="w-4 h-4 text-slate-500" />
+    icon: <Settings className="w-4 h-4 text-slate-500" />,
+    requiredPermission: 'settings:manage'
   }
 ]
 
+export function canAccessTab(user: AccountUser | null, tab: TabKey): boolean {
+  if (tab === 'account-admin') {
+    return hasPermission(user, 'account:self')
+  }
+
+  for (const item of SIDEBAR_ITEMS) {
+    if (item.type === 'item' && item.key === tab) {
+      return !item.requiredPermission || hasPermission(user, item.requiredPermission)
+    }
+
+    if (item.type === 'group') {
+      const child = item.children.find((candidate) => candidate.key === tab)
+      if (child) {
+        return !child.requiredPermission || hasPermission(user, child.requiredPermission)
+      }
+    }
+  }
+
+  return false
+}
+
+export function getAccessibleSidebarItems(user: AccountUser | null): SidebarItem[] {
+  const items: SidebarItem[] = []
+
+  SIDEBAR_ITEMS.forEach((item) => {
+    if (item.type === 'item') {
+      if (!item.requiredPermission || hasPermission(user, item.requiredPermission)) {
+        items.push(item)
+      }
+      return
+    }
+
+    if (item.requiredPermission && !hasPermission(user, item.requiredPermission)) {
+      return
+    }
+
+    const children = item.children.filter(
+      (child) => !child.requiredPermission || hasPermission(user, child.requiredPermission)
+    )
+
+    if (children.length > 0) {
+      items.push({ ...item, children })
+    }
+  })
+
+  return items
+}
+
 export function getBreadcrumbs(activeTab: TabKey): string[] {
+  if (activeTab === 'account-admin') {
+    return ['账户与管理']
+  }
+
   for (const item of SIDEBAR_ITEMS) {
     if (item.type === 'item' && item.key === activeTab) {
       return [item.title]

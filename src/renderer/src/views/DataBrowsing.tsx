@@ -57,6 +57,14 @@ interface CategoryNode {
 export const DataBrowsing: React.FC = () => {
   // 核心状态变量
   const activeTab = useAppStore((state) => state.activeTab)
+  const [selectedDataSource, setSelectedDataSource] = useState('local')
+  const [isSourceRefreshing, setIsSourceRefreshing] = useState(false)
+
+  const handleRefreshSource = () => {
+    setIsSourceRefreshing(true)
+    setTimeout(() => setIsSourceRefreshing(false), 850)
+  }
+
   const [tasks, setTasks] = useState<CrawlTask[]>([])
   const [selectedTaskId, setSelectedTaskId] = useState<number | ''>('')
   const [categories, setCategories] = useState<string[]>([])
@@ -454,6 +462,33 @@ export const DataBrowsing: React.FC = () => {
       <div className="bg-card text-card-foreground border border-border rounded-lg p-5 shadow-sm transition-all duration-200 hover:border-primary/20">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-1 flex-col md:flex-row md:items-center gap-4">
+            {/* 数据源选择 */}
+            <div className="flex items-center space-x-2 shrink-0">
+              <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
+                数据源
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 max-w-[200px] w-full shrink-0">
+              <select
+                value={selectedDataSource}
+                onChange={(e) => setSelectedDataSource(e.target.value)}
+                className="w-full bg-background border border-border rounded-md px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-semibold"
+              >
+                <option value="local">本地数据</option>
+                <option value="lan-shared">局域网共享数据</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleRefreshSource}
+                disabled={isSourceRefreshing}
+                className="p-2 border border-border rounded-md bg-card hover:bg-slate-100 dark:hover:bg-zinc-900 text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-50"
+                title="刷新数据源"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSourceRefreshing ? 'animate-spin text-primary' : ''}`} />
+              </button>
+            </div>
+
             <div className="flex items-center space-x-2 shrink-0">
               <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
                 1. 选择任务标识
