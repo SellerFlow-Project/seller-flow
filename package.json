@@ -1,6 +1,6 @@
 {
   "name": "seller-flow",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "SellerFlow",
   "main": "./out/main/index.js",
   "author": "example.com",

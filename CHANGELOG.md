@@ -4,6 +4,11 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-06-03
+
+- 增加账号系统
+- 增加局域网数据共享功能
+
 ## [0.1.3] - 2026-06-02
 
 - 新增新品排行榜采集任务
