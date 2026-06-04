@@ -35,6 +35,12 @@ export const IPC_CHANNEL = {
     SAVE: 'settings:save',
     UPDATE_APPLICATION: 'settings:update-application'
   },
+  MIHOMO: {
+    GET_STATUS: 'mihomo:get-status',
+    REFRESH_SUBSCRIPTION: 'mihomo:refresh-subscription',
+    LIST_NODES: 'mihomo:list-nodes',
+    TEST_NODE: 'mihomo:test-node'
+  },
   DATA_SHARING: {
     GET_STATUS: 'data-sharing:get-status',
     DISCOVER_SOURCES: 'data-sharing:discover-sources',

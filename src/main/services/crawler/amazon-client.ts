@@ -12,7 +12,6 @@ import {
   AMAZON_UBID_COOKIE_PREFIX,
   DEFAULT_AMAZON_MARKETPLACE,
   createAmazonHtmlHeaders,
-  createAmazonProxyUrl,
   createAmazonRankingUrl,
   createAmazonUrl,
   resolveAmazonMarketplace
@@ -32,11 +31,14 @@ import { sleep } from '../../utils/time'
 import { parseAmazonRankingCategories } from './amazon-parser'
 import { AmazonRiskControlError } from './errors'
 import { sleepForCrawlerRequestDelay } from './runtime-settings'
+import { mihomoService } from '../mihomo.service'
+import type { Dispatcher } from 'undici'
 
 const SOURCE_CSRF_TOKEN_RE = /&quot;anti-csrftoken-a2z&quot;:&quot;(.*?)&quot;/
 const ADDRESS_SELECTION_CSRF_TOKEN_RE = /CSRF_TOKEN\s*:\s*"([^"]+)"/
 
 type LogHandler = (log: string) => void
+type AmazonRequestScope = 'category' | 'detail'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object'
@@ -58,6 +60,15 @@ function assertNoRiskControlHtml(html: string): void {
 
   if (matchedMarker) {
     throw new AmazonRiskControlError(`亚马逊返回风控验证页面，命中特征: ${matchedMarker}`)
+  }
+}
+
+function getAmazonRequestScope(url: string): AmazonRequestScope {
+  try {
+    const pathname = new URL(url).pathname
+    return /^\/dp\/[A-Z0-9]{10}/i.test(pathname) ? 'detail' : 'category'
+  } catch {
+    return url.includes('/dp/') ? 'detail' : 'category'
   }
 }
 
@@ -121,11 +132,17 @@ export class AmazonClient {
 
     onLog(`[系统] 正在进行 ${marketplace} 站点配送地址安全 Cookie 动态握手交换...`)
 
+    let dispatcher: Dispatcher | undefined
     try {
+      dispatcher = await mihomoService.getFetchDispatcher('category', signal)
       await sleepForCrawlerRequestDelay(signal)
       const sessionResponse = await fetchResponse(
-        createAmazonProxyUrl(cookieProbeUrl),
-        { headers: createCookieProbeHeaders(), signal },
+        cookieProbeUrl,
+        {
+          headers: createCookieProbeHeaders(),
+          signal,
+          dispatcher
+        } as RequestInit & { dispatcher?: Dispatcher },
         { errorPrefix: '首页访问失败' }
       )
       const cookieMap = parseSetCookieHeaders(sessionResponse.headers)
@@ -137,11 +154,12 @@ export class AmazonClient {
         cookieProbeUrl,
         cookieHeader,
         sourceCsrfToken,
-        signal
+        signal,
+        dispatcher
       )
       await sleepForCrawlerRequestDelay(signal)
       const addressResponse = await fetchResponse(
-        createAmazonProxyUrl(createAmazonUrl(domain, AMAZON_PATH.ADDRESS_CHANGE)),
+        createAmazonUrl(domain, AMAZON_PATH.ADDRESS_CHANGE),
         {
           method: HTTP_METHOD.POST,
           body: JSON.stringify({
@@ -153,8 +171,9 @@ export class AmazonClient {
             actionSource: AMAZON_ADDRESS_CHANGE_PAYLOAD.ACTION_SOURCE
           }),
           headers: createAddressChangeHeaders(cookieHeader, csrfToken),
-          signal
-        },
+          signal,
+          dispatcher
+        } as RequestInit & { dispatcher?: Dispatcher },
         { errorPrefix: '地址修改请求失败' }
       )
       const ubid = findCookieValueByPrefix(
@@ -179,6 +198,7 @@ export class AmazonClient {
     } catch (error) {
       if (isAbortError(error)) throw error
       if (error instanceof AmazonRiskControlError) throw error
+      mihomoService.markNodeFailure(dispatcher, error, 'category')
       if (isRiskControlHttpError(error)) {
         // throw new AmazonRiskControlError(`亚马逊 Cookie 握手被限制: ${getErrorMessage(error)}`)
       }
@@ -201,13 +221,20 @@ export class AmazonClient {
 
   public async fetchHtml(url: string, cookies: string, signal?: AbortSignal): Promise<string> {
     let lastError: Error | undefined
+    const requestScope = getAmazonRequestScope(url)
 
     for (let attempt = 1; attempt <= AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS; attempt++) {
+      const dispatcher = await mihomoService.getFetchDispatcher(requestScope, signal)
+
       try {
         await sleepForCrawlerRequestDelay(signal)
         const html = await fetchText(
-          createAmazonProxyUrl(url),
-          { headers: createAmazonHtmlHeaders(cookies), signal },
+          url,
+          {
+            headers: createAmazonHtmlHeaders(cookies),
+            signal,
+            dispatcher
+          } as RequestInit & { dispatcher?: Dispatcher },
           { errorPrefix: '页面抓取异常' }
         )
         assertNoRiskControlHtml(html)
@@ -222,6 +249,7 @@ export class AmazonClient {
         // if (!isRiskControl) throw error
 
         lastError = error as Error
+        mihomoService.markNodeFailure(dispatcher, error, requestScope)
 
         // 还有重试机会：切换 UA 后等待退避
         if (attempt < AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS) {
@@ -276,20 +304,23 @@ export class AmazonClient {
     referer: string,
     cookies: string,
     sourceCsrfToken: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    dispatcher?: Dispatcher
   ): Promise<string> {
     try {
       await sleepForCrawlerRequestDelay(signal)
       const html = await fetchText(
-        createAmazonProxyUrl(createAmazonUrl(domain, AMAZON_PATH.ADDRESS_SELECTIONS)),
+        createAmazonUrl(domain, AMAZON_PATH.ADDRESS_SELECTIONS),
         {
           headers: createAddressSelectionHeaders(referer, cookies, sourceCsrfToken),
-          signal
-        }
+          signal,
+          dispatcher
+        } as RequestInit & { dispatcher?: Dispatcher }
       )
       return html.match(ADDRESS_SELECTION_CSRF_TOKEN_RE)?.[1] || ''
     } catch (error) {
       if (isAbortError(error)) throw error
+      mihomoService.markNodeFailure(dispatcher, error, 'category')
       if (isRiskControlHttpError(error)) {
         throw new AmazonRiskControlError(`亚马逊地址验证请求被限制: ${getErrorMessage(error)}`)
       }

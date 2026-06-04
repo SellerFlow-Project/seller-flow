@@ -11,7 +11,6 @@ export const AMAZON_MARKETPLACE = {
 
 export const DEFAULT_AMAZON_MARKETPLACE: AmazonMarketplace = AMAZON_MARKETPLACE.JP
 
-export const AMAZON_PROXY_URL_PREFIX = 'https://proxy.444405.xyz/proxy?url='
 export const AMAZON_MAX_DFS_DEPTH = 10
 export const AMAZON_ASIN_LENGTH = 10
 export const AMAZON_SESSION_COOKIE_NAME = 'session-id'
@@ -113,12 +112,6 @@ export const DEFAULT_AMAZON_BASE_URL = AMAZON_MARKETPLACES[DEFAULT_AMAZON_MARKET
 
 export function createAmazonUrl(domain: string, path: string): string {
   return `https://${domain}${path}`
-}
-
-export function createAmazonProxyUrl(url: string): string {
-  return url.startsWith(AMAZON_PROXY_URL_PREFIX)
-    ? url
-    : `${AMAZON_PROXY_URL_PREFIX}${encodeURIComponent(url)}`
 }
 
 export function createAmazonRankingUrl(baseUrl: string, taskType: CrawlTaskType): string {

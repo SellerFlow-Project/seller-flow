@@ -1,6 +1,8 @@
 export type ThemeMode = 'light' | 'dark'
 export type ThemeColor = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose'
 export type UiScaleMode = 'auto' | '0.8' | '0.9' | '1.0' | '1.1' | '1.2' | '1.5'
+export type CrawlerProxyMode = 'direct' | 'mihomo-node-pool'
+export type CrawlerProxyNodeStrategy = 'round-robin' | 'random' | 'lowest-latency'
 
 export interface ApplicationSettings {
   theme: ThemeMode
@@ -22,6 +24,15 @@ export interface CrawlingSettings {
   concurrencyCount: number
   minDelay: number
   maxDelay: number
+  proxyMode: CrawlerProxyMode
+  proxyNodeStrategy: CrawlerProxyNodeStrategy
+  mihomoEnabled: boolean
+  mihomoSubscriptionUrl: string
+  mihomoBinaryPath: string
+  mihomoControllerPort: number
+  mihomoMixedPortStart: number
+  mihomoMaxNodeCount: number
+  mihomoHealthCheckUrl: string
 }
 
 export interface AiSettings {
@@ -93,6 +104,17 @@ export function isSellerFlowSettings(value: unknown): value is SellerFlowSetting
     typeof crawling.concurrencyCount === 'number' &&
     typeof crawling.minDelay === 'number' &&
     typeof crawling.maxDelay === 'number' &&
+    (crawling.proxyMode === 'direct' || crawling.proxyMode === 'mihomo-node-pool') &&
+    ['round-robin', 'random', 'lowest-latency'].includes(
+      crawling.proxyNodeStrategy as string
+    ) &&
+    typeof crawling.mihomoEnabled === 'boolean' &&
+    typeof crawling.mihomoSubscriptionUrl === 'string' &&
+    typeof crawling.mihomoBinaryPath === 'string' &&
+    typeof crawling.mihomoControllerPort === 'number' &&
+    typeof crawling.mihomoMixedPortStart === 'number' &&
+    typeof crawling.mihomoMaxNodeCount === 'number' &&
+    typeof crawling.mihomoHealthCheckUrl === 'string' &&
     isRecord(ai) &&
     typeof ai.textApiEndpoint === 'string' &&
     typeof ai.textModelName === 'string' &&
@@ -126,7 +148,16 @@ export const DEFAULT_SELLER_FLOW_SETTINGS: SellerFlowSettings = {
     clearHistoryOnNewTask: true,
     concurrencyCount: 1,
     minDelay: 1,
-    maxDelay: 3
+    maxDelay: 3,
+    proxyMode: 'direct',
+    proxyNodeStrategy: 'round-robin',
+    mihomoEnabled: false,
+    mihomoSubscriptionUrl: '',
+    mihomoBinaryPath: '',
+    mihomoControllerPort: 9097,
+    mihomoMixedPortStart: 31001,
+    mihomoMaxNodeCount: -1,
+    mihomoHealthCheckUrl: 'https://www.gstatic.com/generate_204'
   },
   ai: {
     textApiEndpoint: 'https://api.deepseek.com/v1',

@@ -22,6 +22,11 @@ import {
   type DataSharingApi
 } from '../shared/data-sharing'
 import type { AppUpdateApi, AppUpdateState } from '../shared/update'
+import {
+  isMihomoProxyNode,
+  isMihomoRuntimeStatus,
+  type MihomoApi
+} from '../shared/mihomo'
 
 // Custom APIs for renderer
 const updates: AppUpdateApi = {
@@ -160,9 +165,24 @@ const dataSharing: DataSharingApi = {
     invokeAccount('data-sharing:mark-remote-product-read', [source, productId])
 }
 
+const mihomo: MihomoApi = {
+  getStatus: () => invokeAccount('mihomo:get-status', [], isMihomoRuntimeStatus),
+  refreshSubscription: () =>
+    invokeAccount('mihomo:refresh-subscription', [], isMihomoRuntimeStatus),
+  listNodes: () =>
+    invokeAccount(
+      'mihomo:list-nodes',
+      [],
+      (value): value is Awaited<ReturnType<MihomoApi['listNodes']>> =>
+        Array.isArray(value) && value.every(isMihomoProxyNode)
+    ),
+  testNode: (nodeId) => invokeAccount('mihomo:test-node', [nodeId], isMihomoProxyNode)
+}
+
 const api = {
   account,
   dataSharing,
+  mihomo,
   settings,
   updates
 }

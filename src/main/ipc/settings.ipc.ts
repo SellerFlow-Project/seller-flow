@@ -4,6 +4,7 @@ import { handleIpc } from './ipc-handler'
 import type { ApplicationSettings, SellerFlowSettings } from '../../shared/settings'
 import { crawlerService } from '../services/crawler.service'
 import { dataSharingService } from '../services/data-sharing.service'
+import { mihomoService } from '../services/mihomo.service'
 
 export function registerSettingsIPC(): void {
   handleIpc(IPC_CHANNEL.SETTINGS.GET, () => getSettings())
@@ -12,6 +13,7 @@ export function registerSettingsIPC(): void {
     async (_event, settings) => {
       const savedSettings = saveSettings(settings)
       crawlerService.applyCrawlingSettings(savedSettings.crawling)
+      await mihomoService.applySettings(savedSettings.crawling)
       await dataSharingService.applySettings(savedSettings.dataSharing)
       return savedSettings
     }

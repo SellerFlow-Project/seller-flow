@@ -3,6 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { APP_NAME, APP_USER_MODEL_ID } from './config/app'
 import { IPC_CHANNEL } from './config/ipc'
 import { registerAllIPC } from './ipc'
+import { mihomoService } from './services/mihomo.service'
 import { initializeAutoUpdater } from './services/update.service'
 import { createMainWindow } from './window/main-window'
 
@@ -21,6 +22,10 @@ function registerAppLifecycle(): void {
     if (process.platform !== 'darwin') {
       app.quit()
     }
+  })
+
+  app.on('before-quit', () => {
+    void mihomoService.shutdown()
   })
 }
 

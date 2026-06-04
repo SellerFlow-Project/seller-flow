@@ -5,8 +5,10 @@ import { registerCrawlerIPC } from './crawler.ipc'
 import { registerSellerSpriteIPC } from './sellersprite.ipc'
 import { registerSettingsIPC } from './settings.ipc'
 import { registerUpdateIPC } from './update.ipc'
+import { registerMihomoIPC } from './mihomo.ipc'
 import { getSettings } from '../services/settings.service'
 import { dataSharingService } from '../services/data-sharing.service'
+import { mihomoService } from '../services/mihomo.service'
 
 /**
  * 集中注册主进程中所有的 IPC 管道监听
@@ -19,9 +21,12 @@ export function registerAllIPC(): void {
   registerCrawlerIPC()
   registerSellerSpriteIPC()
   registerSettingsIPC()
+  registerMihomoIPC()
   registerUpdateIPC()
-  void dataSharingService.applySettings(getSettings().dataSharing)
+  const settings = getSettings()
+  void dataSharingService.applySettings(settings.dataSharing)
+  void mihomoService.applySettings(settings.crawling)
   console.log(
-    '[IPC] 账号、数据库、数据共享、爬虫、卖家精灵、设置与更新服务的所有 IPC 消息管道注册完毕。'
+    '[IPC] 账号、数据库、数据共享、Mihomo、爬虫、卖家精灵、设置与更新服务的所有 IPC 消息管道注册完毕。'
   )
 }
