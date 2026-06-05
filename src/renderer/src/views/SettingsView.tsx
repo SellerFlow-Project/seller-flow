@@ -828,7 +828,7 @@ export const SettingsView: React.FC = () => {
                           className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
                         >
                           <option value="sticky-10-minutes">
-                            定时粘性轮换（分类10分钟/详情5分钟，默认）
+                            定时粘性轮换（分类10分钟/详情2分钟，默认）
                           </option>
                           <option value="round-robin">轮询节点</option>
                           <option value="random">随机节点</option>
@@ -836,7 +836,7 @@ export const SettingsView: React.FC = () => {
                         </select>
                         <p className="text-[10px] text-muted-foreground">
                           默认策略会让分类/翻页固定使用一个节点 10 分钟，商品详情子任务固定使用一个节点
-                          5 分钟；二者独立轮换，遇到对应请求类型的明确风控或冷却时才单独切换。
+                          2 分钟；二者独立轮换，遇到对应请求类型的明确风控或冷却时才单独切换。
                         </p>
                       </div>
 
