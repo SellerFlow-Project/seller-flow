@@ -1,5 +1,9 @@
 export type MihomoProxyMode = 'disabled' | 'node-pool'
-export type MihomoNodeStrategy = 'round-robin' | 'random' | 'lowest-latency'
+export type MihomoNodeStrategy =
+  | 'sticky-10-minutes'
+  | 'round-robin'
+  | 'random'
+  | 'lowest-latency'
 
 export interface MihomoProxyNode {
   id: string
@@ -7,12 +11,17 @@ export interface MihomoProxyNode {
   type: string
   localPort: number
   alive: boolean
+  currentScopes?: Array<'category' | 'detail'>
   latency?: number | null
   lastError?: string
   failCount: number
   cooldownUntil?: string | null
   categoryCooldownUntil?: string | null
   detailCooldownUntil?: string | null
+  categoryCooldownReason?: string
+  detailCooldownReason?: string
+  categoryNetworkFailCount?: number
+  detailNetworkFailCount?: number
 }
 
 export interface MihomoRuntimeStatus {

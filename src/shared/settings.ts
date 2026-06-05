@@ -2,7 +2,11 @@ export type ThemeMode = 'light' | 'dark'
 export type ThemeColor = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose'
 export type UiScaleMode = 'auto' | '0.8' | '0.9' | '1.0' | '1.1' | '1.2' | '1.5'
 export type CrawlerProxyMode = 'direct' | 'mihomo-node-pool'
-export type CrawlerProxyNodeStrategy = 'round-robin' | 'random' | 'lowest-latency'
+export type CrawlerProxyNodeStrategy =
+  | 'sticky-10-minutes'
+  | 'round-robin'
+  | 'random'
+  | 'lowest-latency'
 
 export interface ApplicationSettings {
   theme: ThemeMode
@@ -105,7 +109,7 @@ export function isSellerFlowSettings(value: unknown): value is SellerFlowSetting
     typeof crawling.minDelay === 'number' &&
     typeof crawling.maxDelay === 'number' &&
     (crawling.proxyMode === 'direct' || crawling.proxyMode === 'mihomo-node-pool') &&
-    ['round-robin', 'random', 'lowest-latency'].includes(
+    ['sticky-10-minutes', 'round-robin', 'random', 'lowest-latency'].includes(
       crawling.proxyNodeStrategy as string
     ) &&
     typeof crawling.mihomoEnabled === 'boolean' &&
@@ -150,7 +154,7 @@ export const DEFAULT_SELLER_FLOW_SETTINGS: SellerFlowSettings = {
     minDelay: 1,
     maxDelay: 3,
     proxyMode: 'direct',
-    proxyNodeStrategy: 'round-robin',
+    proxyNodeStrategy: 'sticky-10-minutes',
     mihomoEnabled: false,
     mihomoSubscriptionUrl: '',
     mihomoBinaryPath: '',

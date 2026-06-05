@@ -26,15 +26,29 @@ interface ClashSubscriptionConfig {
 type NodeSelectionStrategy = CrawlingSettings['proxyNodeStrategy']
 type MihomoProxyConfig = Record<string, unknown>
 type MihomoRequestScope = 'general' | 'category' | 'detail'
+type MihomoFailureKind = 'risk-control' | 'network' | 'server-error'
+
+interface MihomoNodeFailure {
+  kind: MihomoFailureKind
+  error: unknown
+}
 
 type ScopedMihomoProxyNode = MihomoProxyNode & {
   scopeCooldownUntil: Partial<Record<MihomoRequestScope, string>>
+  scopeCooldownReason: Partial<Record<MihomoRequestScope, string>>
+  scopeNetworkFailCount: Partial<Record<MihomoRequestScope, number>>
+  stickyStartedAt: Partial<Record<MihomoRequestScope, number>>
 }
 
 const MIHOMO_RUNTIME_DIR_NAME = 'mihomo-runtime'
 const MIHOMO_CONFIG_FILE_NAME = 'config.yaml'
 const MIHOMO_CONTROLLER_HOST = '127.0.0.1'
-const NODE_COOLDOWN_MS = 10 * 60 * 1000
+const NODE_RISK_CONTROL_COOLDOWN_MS = 10 * 60 * 1000
+const NODE_NETWORK_SOFT_COOLDOWN_MS = 60 * 1000
+const NODE_NETWORK_HARD_COOLDOWN_MS = 3 * 60 * 1000
+const NODE_NETWORK_HARD_FAILURE_THRESHOLD = 3
+const NODE_CATEGORY_STICKY_ROTATION_MS = 10 * 60 * 1000
+const NODE_DETAIL_STICKY_ROTATION_MS = 5 * 60 * 1000
 const NODE_POOL_WAIT_POLL_MS = 1000
 const NODE_POOL_MAX_WAIT_SLICE_MS = 60_000
 const DEFAULT_TEST_TIMEOUT_MS = 8000
@@ -617,7 +631,8 @@ class MihomoService {
   private settings: CrawlingSettings | null = null
   private controllerUrl = ''
   private lastError = ''
-  private roundRobinIndex = 0
+  private roundRobinIndexes: Partial<Record<MihomoRequestScope, number>> = {}
+  private stickyNodeIds: Partial<Record<MihomoRequestScope, string>> = {}
 
   public async applySettings(settings: CrawlingSettings): Promise<MihomoRuntimeStatus> {
     this.settings = settings
@@ -650,7 +665,26 @@ class MihomoService {
   }
 
   public listNodes(): MihomoProxyNode[] {
-    return this.nodes.map((node) => ({ ...node }))
+    return this.nodes.map((node) => ({
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      localPort: node.localPort,
+      alive: node.alive,
+      currentScopes: (['category', 'detail'] as const).filter(
+        (scope) => this.stickyNodeIds[scope] === node.id
+      ),
+      latency: node.latency,
+      lastError: node.lastError,
+      failCount: node.failCount,
+      cooldownUntil: node.cooldownUntil,
+      categoryCooldownUntil: node.categoryCooldownUntil,
+      detailCooldownUntil: node.detailCooldownUntil,
+      categoryCooldownReason: node.scopeCooldownReason.category,
+      detailCooldownReason: node.scopeCooldownReason.detail,
+      categoryNetworkFailCount: node.scopeNetworkFailCount.category || 0,
+      detailNetworkFailCount: node.scopeNetworkFailCount.detail || 0
+    }))
   }
 
   public getCoreInfo(): MihomoCoreInfo {
@@ -730,6 +764,8 @@ class MihomoService {
       )
 
       await this.restartCore(binaryPath, runtimeDir, settings)
+      this.roundRobinIndexes = {}
+      this.stickyNodeIds = {}
       this.nodes = nodes.map((node, index) => ({
         id: sanitizeNodeId(String(node.name), index),
         name: String(node.name),
@@ -741,7 +777,10 @@ class MihomoService {
         cooldownUntil: null,
         categoryCooldownUntil: null,
         detailCooldownUntil: null,
-        scopeCooldownUntil: {}
+        scopeCooldownUntil: {},
+        scopeCooldownReason: {},
+        scopeNetworkFailCount: {},
+        stickyStartedAt: {}
       }))
       this.agents.clear()
     } catch (error) {
@@ -770,13 +809,16 @@ class MihomoService {
         node.categoryCooldownUntil = null
         node.detailCooldownUntil = null
         node.scopeCooldownUntil = {}
+        node.scopeCooldownReason = {}
+        node.scopeNetworkFailCount = {}
+        node.stickyStartedAt = {}
       }
       return { ...node }
     } catch (error) {
       node.alive = false
       node.lastError = getErrorMessage(error)
       node.failCount++
-      node.cooldownUntil = new Date(Date.now() + NODE_COOLDOWN_MS).toISOString()
+      node.cooldownUntil = new Date(Date.now() + NODE_NETWORK_SOFT_COOLDOWN_MS).toISOString()
       return { ...node }
     }
   }
@@ -802,7 +844,7 @@ class MihomoService {
 
   public markNodeFailure(
     dispatcher: Dispatcher | undefined,
-    error: unknown,
+    failure: unknown,
     scope: MihomoRequestScope = 'general'
   ): void {
     if (!dispatcher) return
@@ -810,9 +852,83 @@ class MihomoService {
     const node = this.nodes.find((item) => this.agents.get(item.id) === dispatcher)
     if (!node) return
 
-    const cooldownUntil = new Date(Date.now() + NODE_COOLDOWN_MS).toISOString()
     node.failCount++
-    node.lastError = getErrorMessage(error)
+    const normalizedFailure = this.normalizeNodeFailure(failure)
+    node.lastError = getErrorMessage(normalizedFailure.error)
+
+    if (normalizedFailure.kind === 'server-error') {
+      return
+    }
+
+    if (normalizedFailure.kind === 'risk-control') {
+      this.cooldownNodeScope(
+        node,
+        scope,
+        NODE_RISK_CONTROL_COOLDOWN_MS,
+        `明确风控：${getErrorMessage(normalizedFailure.error)}`
+      )
+      node.scopeNetworkFailCount[scope] = 0
+      return
+    }
+
+    const networkFailCount = (node.scopeNetworkFailCount[scope] || 0) + 1
+    node.scopeNetworkFailCount[scope] = networkFailCount
+    this.cooldownNodeScope(
+      node,
+      scope,
+      networkFailCount >= NODE_NETWORK_HARD_FAILURE_THRESHOLD
+        ? NODE_NETWORK_HARD_COOLDOWN_MS
+        : NODE_NETWORK_SOFT_COOLDOWN_MS,
+      `网络异常第 ${networkFailCount} 次：${getErrorMessage(normalizedFailure.error)}`
+    )
+  }
+
+  public markNodeSuccess(
+    dispatcher: Dispatcher | undefined,
+    scope: MihomoRequestScope = 'general'
+  ): void {
+    if (!dispatcher) return
+
+    const node = this.nodes.find((item) => this.agents.get(item.id) === dispatcher)
+    if (!node) return
+
+    node.alive = true
+    node.lastError = undefined
+    if (scope === 'general') {
+      node.cooldownUntil = null
+      return
+    }
+
+    node.scopeNetworkFailCount[scope] = 0
+  }
+
+  private normalizeNodeFailure(failure: unknown): MihomoNodeFailure {
+    if (isRecord(failure) && typeof failure.kind === 'string' && 'error' in failure) {
+      if (
+        failure.kind === 'risk-control' ||
+        failure.kind === 'network' ||
+        failure.kind === 'server-error'
+      ) {
+        return {
+          kind: failure.kind,
+          error: failure.error
+        }
+      }
+    }
+
+    return {
+      kind: 'network',
+      error: failure
+    }
+  }
+
+  private cooldownNodeScope(
+    node: ScopedMihomoProxyNode,
+    scope: MihomoRequestScope,
+    cooldownMilliseconds: number,
+    reason: string
+  ): void {
+    const cooldownUntil = new Date(Date.now() + cooldownMilliseconds).toISOString()
 
     if (scope === 'general') {
       node.cooldownUntil = cooldownUntil
@@ -821,10 +937,11 @@ class MihomoService {
     }
 
     node.scopeCooldownUntil[scope] = cooldownUntil
+    node.scopeCooldownReason[scope] = reason
+    delete node.stickyStartedAt[scope]
     if (scope === 'category') node.categoryCooldownUntil = cooldownUntil
     if (scope === 'detail') node.detailCooldownUntil = cooldownUntil
   }
-
 
   private async fetchSubscription(subscriptionUrl: string): Promise<ClashSubscriptionConfig> {
     const response = await fetch(subscriptionUrl)
@@ -920,6 +1037,8 @@ class MihomoService {
   private async stop(): Promise<void> {
     this.agents.clear()
     this.nodes = []
+    this.roundRobinIndexes = {}
+    this.stickyNodeIds = {}
     if (!this.process) return
 
     const currentProcess = this.process
@@ -976,6 +1095,7 @@ class MihomoService {
       const cooldownUntil = node.scopeCooldownUntil[scope]
       if (cooldownUntil && Date.parse(cooldownUntil) <= now) {
         delete node.scopeCooldownUntil[scope]
+        delete node.scopeCooldownReason[scope]
         if (scope === 'category') node.categoryCooldownUntil = null
         if (scope === 'detail') node.detailCooldownUntil = null
       }
@@ -1002,6 +1122,10 @@ class MihomoService {
 
     if (availableNodes.length === 0) return null
 
+    if (strategy === 'sticky-10-minutes') {
+      return this.pickStickyNode(availableNodes, scope)
+    }
+
     if (strategy === 'random') {
       return availableNodes[Math.floor(Math.random() * availableNodes.length)]
     }
@@ -1014,8 +1138,50 @@ class MihomoService {
       })[0]
     }
 
-    const node = availableNodes[this.roundRobinIndex % availableNodes.length]
-    this.roundRobinIndex++
+    return this.pickNextRoundRobinNode(availableNodes, scope)
+  }
+
+  private pickStickyNode(
+    availableNodes: ScopedMihomoProxyNode[],
+    scope: MihomoRequestScope
+  ): ScopedMihomoProxyNode {
+    const now = Date.now()
+    const rotationMilliseconds = this.getStickyRotationMilliseconds(scope)
+    const stickyNodeId = this.stickyNodeIds[scope]
+    const stickyNode = stickyNodeId
+      ? availableNodes.find((node) => node.id === stickyNodeId)
+      : undefined
+
+    if (stickyNode) {
+      const stickyStartedAt = stickyNode.stickyStartedAt[scope] || now
+      stickyNode.stickyStartedAt[scope] = stickyStartedAt
+      if (now - stickyStartedAt < rotationMilliseconds) {
+        return stickyNode
+      }
+    }
+
+    const rotationCandidates =
+      stickyNode && availableNodes.length > 1
+        ? availableNodes.filter((node) => node.id !== stickyNode.id)
+        : availableNodes
+    const nextNode = this.pickNextRoundRobinNode(rotationCandidates, scope)
+    this.stickyNodeIds[scope] = nextNode.id
+    nextNode.stickyStartedAt[scope] = now
+    return nextNode
+  }
+
+  private getStickyRotationMilliseconds(scope: MihomoRequestScope): number {
+    if (scope === 'detail') return NODE_DETAIL_STICKY_ROTATION_MS
+    return NODE_CATEGORY_STICKY_ROTATION_MS
+  }
+
+  private pickNextRoundRobinNode(
+    availableNodes: ScopedMihomoProxyNode[],
+    scope: MihomoRequestScope
+  ): ScopedMihomoProxyNode {
+    const index = this.roundRobinIndexes[scope] || 0
+    const node = availableNodes[index % availableNodes.length]
+    this.roundRobinIndexes[scope] = index + 1
     return node
   }
 }

@@ -21,6 +21,7 @@ const THEME_COLORS = new Set<ThemeColor>(['blue', 'emerald', 'violet', 'amber', 
 const UI_SCALE_MODES = new Set<UiScaleMode>(['auto', '0.8', '0.9', '1.0', '1.1', '1.2', '1.5'])
 const CRAWLER_PROXY_MODES = new Set<CrawlerProxyMode>(['direct', 'mihomo-node-pool'])
 const CRAWLER_PROXY_NODE_STRATEGIES = new Set<CrawlerProxyNodeStrategy>([
+  'sticky-10-minutes',
   'round-robin',
   'random',
   'lowest-latency'

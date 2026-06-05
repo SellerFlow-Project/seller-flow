@@ -36,9 +36,16 @@ import type { Dispatcher } from 'undici'
 
 const SOURCE_CSRF_TOKEN_RE = /&quot;anti-csrftoken-a2z&quot;:&quot;(.*?)&quot;/
 const ADDRESS_SELECTION_CSRF_TOKEN_RE = /CSRF_TOKEN\s*:\s*"([^"]+)"/
+const AMAZON_FETCH_HTTP_ATTEMPTS = 1
 
 type LogHandler = (log: string) => void
 type AmazonRequestScope = 'category' | 'detail'
+type AmazonRequestFailureKind = 'risk-control' | 'server-error' | 'network'
+
+interface AmazonRequestFailure {
+  kind: AmazonRequestFailureKind
+  error: unknown
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object'
@@ -52,6 +59,10 @@ function isRiskControlHttpError(error: unknown): error is HttpStatusError {
   return error instanceof HttpStatusError && AMAZON_RISK_CONTROL_HTTP_STATUS.has(error.status)
 }
 
+function isServerHttpError(error: unknown): error is HttpStatusError {
+  return error instanceof HttpStatusError && error.status >= 500
+}
+
 function assertNoRiskControlHtml(html: string): void {
   const normalizedHtml = html.toLowerCase()
   const matchedMarker = AMAZON_RISK_CONTROL_HTML_MARKERS.find((marker) =>
@@ -61,6 +72,32 @@ function assertNoRiskControlHtml(html: string): void {
   if (matchedMarker) {
     throw new AmazonRiskControlError(`亚马逊返回风控验证页面，命中特征: ${matchedMarker}`)
   }
+}
+
+function classifyAmazonRequestFailure(error: unknown): AmazonRequestFailure {
+  if (error instanceof AmazonRiskControlError || isRiskControlHttpError(error)) {
+    return { kind: 'risk-control', error }
+  }
+
+  if (isServerHttpError(error)) {
+    return { kind: 'server-error', error }
+  }
+
+  return { kind: 'network', error }
+}
+
+function createAmazonRetryError(failure: AmazonRequestFailure | undefined): Error {
+  if (!failure) {
+    return new Error('亚马逊页面请求失败，未捕获到具体错误。')
+  }
+
+  if (failure.kind === 'risk-control') {
+    return new AmazonRiskControlError(
+      `亚马逊页面请求被风控: ${getErrorMessage(failure.error)}`
+    )
+  }
+
+  return new Error(`亚马逊页面请求异常: ${getErrorMessage(failure.error)}`)
 }
 
 function getAmazonRequestScope(url: string): AmazonRequestScope {
@@ -143,7 +180,7 @@ export class AmazonClient {
           signal,
           dispatcher
         } as RequestInit & { dispatcher?: Dispatcher },
-        { errorPrefix: '首页访问失败' }
+        { errorPrefix: '首页访问失败', maxAttempts: AMAZON_FETCH_HTTP_ATTEMPTS }
       )
       const cookieMap = parseSetCookieHeaders(sessionResponse.headers)
       const sessionId = cookieMap.get(AMAZON_SESSION_COOKIE_NAME) || ''
@@ -174,7 +211,7 @@ export class AmazonClient {
           signal,
           dispatcher
         } as RequestInit & { dispatcher?: Dispatcher },
-        { errorPrefix: '地址修改请求失败' }
+        { errorPrefix: '地址修改请求失败', maxAttempts: AMAZON_FETCH_HTTP_ATTEMPTS }
       )
       const ubid = findCookieValueByPrefix(
         parseSetCookieHeaders(addressResponse.headers),
@@ -185,6 +222,7 @@ export class AmazonClient {
         throw new Error('必要 Cookie 信息为空')
       }
 
+      mihomoService.markNodeSuccess(dispatcher, 'category')
       return {
         success: true,
         cookies: serializeCookies(
@@ -198,10 +236,7 @@ export class AmazonClient {
     } catch (error) {
       if (isAbortError(error)) throw error
       if (error instanceof AmazonRiskControlError) throw error
-      mihomoService.markNodeFailure(dispatcher, error, 'category')
-      if (isRiskControlHttpError(error)) {
-        // throw new AmazonRiskControlError(`亚马逊 Cookie 握手被限制: ${getErrorMessage(error)}`)
-      }
+      mihomoService.markNodeFailure(dispatcher, classifyAmazonRequestFailure(error), 'category')
 
       const message = getErrorMessage(error)
       onLog(`[警告] 动态地址 Cookie 交换异常: ${message}。启用降级方案。`)
@@ -220,7 +255,7 @@ export class AmazonClient {
   }
 
   public async fetchHtml(url: string, cookies: string, signal?: AbortSignal): Promise<string> {
-    let lastError: Error | undefined
+    let lastFailure: AmazonRequestFailure | undefined
     const requestScope = getAmazonRequestScope(url)
 
     for (let attempt = 1; attempt <= AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS; attempt++) {
@@ -235,21 +270,18 @@ export class AmazonClient {
             signal,
             dispatcher
           } as RequestInit & { dispatcher?: Dispatcher },
-          { errorPrefix: '页面抓取异常' }
+          { errorPrefix: '页面抓取异常', maxAttempts: AMAZON_FETCH_HTTP_ATTEMPTS }
         )
         assertNoRiskControlHtml(html)
+        mihomoService.markNodeSuccess(dispatcher, requestScope)
         return html
       } catch (error) {
         // 用户主动中止，立即抛出
         if (isAbortError(error as Error)) throw error
 
-        // const isRiskControl =
-        //   error instanceof AmazonRiskControlError || isRiskControlHttpError(error)
-
-        // if (!isRiskControl) throw error
-
-        lastError = error as Error
-        mihomoService.markNodeFailure(dispatcher, error, requestScope)
+        const failure = classifyAmazonRequestFailure(error)
+        lastFailure = failure
+        mihomoService.markNodeFailure(dispatcher, failure, requestScope)
 
         // 还有重试机会：切换 UA 后等待退避
         if (attempt < AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS) {
@@ -263,9 +295,7 @@ export class AmazonClient {
       }
     }
 
-    throw new AmazonRiskControlError(
-      `亚马逊页面请求被风控，已重试 ${AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS} 次仍失败: ${getErrorMessage(lastError)}`
-    )
+    throw createAmazonRetryError(lastFailure)
   }
 
   public async fetchRankingPage(
@@ -315,12 +345,14 @@ export class AmazonClient {
           headers: createAddressSelectionHeaders(referer, cookies, sourceCsrfToken),
           signal,
           dispatcher
-        } as RequestInit & { dispatcher?: Dispatcher }
+        } as RequestInit & { dispatcher?: Dispatcher },
+        { errorPrefix: '地址验证请求失败', maxAttempts: AMAZON_FETCH_HTTP_ATTEMPTS }
       )
+      mihomoService.markNodeSuccess(dispatcher, 'category')
       return html.match(ADDRESS_SELECTION_CSRF_TOKEN_RE)?.[1] || ''
     } catch (error) {
       if (isAbortError(error)) throw error
-      mihomoService.markNodeFailure(dispatcher, error, 'category')
+      mihomoService.markNodeFailure(dispatcher, classifyAmazonRequestFailure(error), 'category')
       if (isRiskControlHttpError(error)) {
         throw new AmazonRiskControlError(`亚马逊地址验证请求被限制: ${getErrorMessage(error)}`)
       }

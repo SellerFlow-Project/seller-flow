@@ -4,6 +4,12 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-06-06
+
+- 优化爬虫风控处理逻辑
+- 优化节点切换策略
+- mihomo内核支持在线下载
+
 ## [0.1.6] - 2026-06-04
 
 - 新增 Clash 代理池

@@ -4,6 +4,7 @@ import { generateUserAgent } from './user-agent'
 
 interface FetchResponseOptions {
   errorPrefix?: string
+  maxAttempts?: number
 }
 
 export class HttpStatusError extends Error {
@@ -66,14 +67,14 @@ export async function fetchResponse(
   options: FetchResponseOptions = {}
 ): Promise<Response> {
   const baseInit: RequestInit = { ...init }
+  const maxAttempts = Math.max(1, Math.floor(options.maxAttempts || HTTP_RETRY_POLICY.MAX_ATTEMPTS))
 
-  for (let attempt = 1; attempt <= HTTP_RETRY_POLICY.MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const requestInit = applyUserAgent(baseInit, currentUserAgent)
     const response = await fetch(input, requestInit)
     if (response.ok) return response
 
-    const shouldRetry =
-      HTTP_RETRY_STATUS.has(response.status) && attempt < HTTP_RETRY_POLICY.MAX_ATTEMPTS
+    const shouldRetry = HTTP_RETRY_STATUS.has(response.status) && attempt < maxAttempts
     if (shouldRetry) {
       await sleep(getRetryDelayMs(response, attempt), init?.signal || undefined)
       // 重试前切换 User-Agent，后续所有请求都沿用新的 UA
