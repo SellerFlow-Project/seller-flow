@@ -19,6 +19,44 @@ function formatBytes(bytes: number): string {
   return `${megabytes.toFixed(megabytes >= 10 ? 1 : 2)} MB`
 }
 
+function looksLikeHtml(value: string): boolean {
+  return /<\/?[a-z][\s\S]*>/i.test(value)
+}
+
+function normalizeReleaseNotesForDisplay(releaseNotes: string): string {
+  if (!looksLikeHtml(releaseNotes)) {
+    return releaseNotes
+  }
+
+  const htmlWithReadableBreaks = releaseNotes
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li\b[^>]*>/gi, '\n• ')
+    .replace(/<\/(p|div|section|article|header|footer|h[1-6]|li|ul|ol|blockquote|pre)>/gi, '\n')
+
+  try {
+    const document = new DOMParser().parseFromString(htmlWithReadableBreaks, 'text/html')
+    const text = document.body.textContent || ''
+    return text
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n')
+  } catch {
+    return htmlWithReadableBreaks
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join('\n')
+  }
+}
+
 export function UpdateDialog(): React.JSX.Element | null {
   const { state, checkForUpdates, downloadUpdate, quitAndInstall } = useAppUpdater()
   const [dismissedDialogKey, setDismissedDialogKey] = useState<string>()
@@ -36,6 +74,9 @@ export function UpdateDialog(): React.JSX.Element | null {
 
   const progressPercent = Math.min(100, Math.max(0, state.progress?.percent || 0))
   const error = actionError || state.error
+  const releaseNotes = state.updateInfo?.releaseNotes
+    ? normalizeReleaseNotesForDisplay(state.updateInfo.releaseNotes)
+    : ''
 
   async function runAction(
     action: () => Promise<{ success: boolean; message?: string }>
@@ -84,13 +125,13 @@ export function UpdateDialog(): React.JSX.Element | null {
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          {state.updateInfo?.releaseNotes && (
+          {releaseNotes && (
             <div>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                 本次更新内容
               </h3>
               <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/35 p-3 text-xs leading-relaxed text-muted-foreground">
-                {state.updateInfo.releaseNotes}
+                {releaseNotes}
               </div>
             </div>
           )}

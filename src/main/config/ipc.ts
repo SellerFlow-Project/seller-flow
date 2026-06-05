@@ -37,6 +37,8 @@ export const IPC_CHANNEL = {
   },
   MIHOMO: {
     GET_STATUS: 'mihomo:get-status',
+    GET_CORE_INFO: 'mihomo:get-core-info',
+    DOWNLOAD_CORE: 'mihomo:download-core',
     REFRESH_SUBSCRIPTION: 'mihomo:refresh-subscription',
     LIST_NODES: 'mihomo:list-nodes',
     TEST_NODE: 'mihomo:test-node'

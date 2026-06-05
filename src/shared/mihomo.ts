@@ -25,8 +25,19 @@ export interface MihomoRuntimeStatus {
   error?: string
 }
 
+export interface MihomoCoreInfo {
+  version: string
+  platformArch: string
+  defaultBinaryPath: string
+  downloadUrl?: string
+  installed: boolean
+  supported: boolean
+}
+
 export interface MihomoApi {
   getStatus: () => Promise<MihomoRuntimeStatus>
+  getCoreInfo: () => Promise<MihomoCoreInfo>
+  downloadCore: () => Promise<MihomoCoreInfo>
   refreshSubscription: () => Promise<MihomoRuntimeStatus>
   listNodes: () => Promise<MihomoProxyNode[]>
   testNode: (nodeId: string) => Promise<MihomoProxyNode>
@@ -56,5 +67,17 @@ export function isMihomoRuntimeStatus(value: unknown): value is MihomoRuntimeSta
     (value.mode === 'disabled' || value.mode === 'node-pool') &&
     typeof value.controllerUrl === 'string' &&
     typeof value.nodeCount === 'number'
+  )
+}
+
+export function isMihomoCoreInfo(value: unknown): value is MihomoCoreInfo {
+  return (
+    isRecord(value) &&
+    typeof value.version === 'string' &&
+    typeof value.platformArch === 'string' &&
+    typeof value.defaultBinaryPath === 'string' &&
+    typeof value.installed === 'boolean' &&
+    typeof value.supported === 'boolean' &&
+    (value.downloadUrl === undefined || typeof value.downloadUrl === 'string')
   )
 }

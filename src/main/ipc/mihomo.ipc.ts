@@ -5,6 +5,10 @@ import { handleIpc } from './ipc-handler'
 
 export function registerMihomoIPC(): void {
   handleIpc(IPC_CHANNEL.MIHOMO.GET_STATUS, () => mihomoService.getStatus())
+  handleIpc(IPC_CHANNEL.MIHOMO.GET_CORE_INFO, () => mihomoService.getCoreInfo())
+  handleIpc(IPC_CHANNEL.MIHOMO.DOWNLOAD_CORE, async () => {
+    return await mihomoService.downloadCore()
+  })
   handleIpc(IPC_CHANNEL.MIHOMO.LIST_NODES, () => mihomoService.listNodes())
   handleIpc(IPC_CHANNEL.MIHOMO.REFRESH_SUBSCRIPTION, async () => {
     return await mihomoService.refreshSubscription(getCrawlingSettings())

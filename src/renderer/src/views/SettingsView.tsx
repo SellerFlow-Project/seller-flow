@@ -13,6 +13,7 @@ import {
   Trash2,
   Brain,
   Cpu,
+  Download,
   Image as ImageIcon,
   RefreshCw,
   Globe2,
@@ -29,7 +30,7 @@ import {
   type ThemeColor,
   type UiScaleMode
 } from '../../../shared/settings'
-import type { MihomoProxyNode } from '../../../shared/mihomo'
+import type { MihomoCoreInfo, MihomoProxyNode } from '../../../shared/mihomo'
 import type { AppUpdateState } from '../../../shared/update'
 import { useAppStore } from '../store/appStore'
 import { useAppUpdater } from '../hooks/useAppUpdater'
@@ -111,8 +112,10 @@ export const SettingsView: React.FC = () => {
   )
   const [sharingStatusText, setSharingStatusText] = useState('')
   const [mihomoStatusText, setMihomoStatusText] = useState('')
+  const [mihomoCoreInfo, setMihomoCoreInfo] = useState<MihomoCoreInfo | null>(null)
   const [mihomoNodes, setMihomoNodes] = useState<MihomoProxyNode[]>([])
   const [isRefreshingMihomo, setIsRefreshingMihomo] = useState(false)
+  const [isDownloadingMihomoCore, setIsDownloadingMihomoCore] = useState(false)
   const [testingNodeId, setTestingNodeId] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
@@ -133,6 +136,7 @@ export const SettingsView: React.FC = () => {
           setDraftSettings(settings)
           setSaveError('')
           void refreshMihomoState()
+          void refreshMihomoCoreInfo()
         }
       })
       .catch((error) => {
@@ -246,6 +250,32 @@ export const SettingsView: React.FC = () => {
       )
     } catch (error) {
       setMihomoStatusText(`读取 Mihomo 状态失败：${String(error)}`)
+    }
+  }
+
+  const refreshMihomoCoreInfo = async (): Promise<void> => {
+    try {
+      const coreInfo = await window.api.mihomo.getCoreInfo()
+      setMihomoCoreInfo(coreInfo)
+    } catch (error) {
+      setSaveError(`读取 Mihomo Core 信息失败：${String(error)}`)
+    }
+  }
+
+  const handleDownloadMihomoCore = async (): Promise<void> => {
+    setIsDownloadingMihomoCore(true)
+    setSaveError('')
+    try {
+      const coreInfo = await window.api.mihomo.downloadCore()
+      setMihomoCoreInfo(coreInfo)
+      updateCrawlingDraft({ mihomoBinaryPath: '' })
+      setMihomoStatusText(
+        `Mihomo Core ${coreInfo.version} 下载完成，默认路径：${coreInfo.defaultBinaryPath}`
+      )
+    } catch (error) {
+      setSaveError(`下载 Mihomo Core 失败：${String(error)}`)
+    } finally {
+      setIsDownloadingMihomoCore(false)
     }
   }
 
@@ -712,11 +742,54 @@ export const SettingsView: React.FC = () => {
                         <label className="text-[11px] font-semibold text-muted-foreground">
                           Mihomo Core 路径
                         </label>
+                        <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="space-y-1">
+                              <p className="text-xs font-semibold text-foreground">
+                                默认在线 Core：
+                                {mihomoCoreInfo?.version || '读取中'}
+                              </p>
+                              <p className="break-all text-[10px] leading-relaxed text-muted-foreground">
+                                {mihomoCoreInfo?.defaultBinaryPath ||
+                                  '留空路径时会使用用户数据目录中的 Mihomo Core。'}
+                              </p>
+                              {mihomoCoreInfo && !mihomoCoreInfo.supported && (
+                                <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                                  当前平台 {mihomoCoreInfo.platformArch} 暂不支持自动下载，请手动填写
+                                  Core 路径。
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => void handleDownloadMihomoCore()}
+                              disabled={
+                                isDownloadingMihomoCore || Boolean(mihomoCoreInfo && !mihomoCoreInfo.supported)
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <Download
+                                className={`h-3.5 w-3.5 ${isDownloadingMihomoCore ? 'animate-pulse' : ''}`}
+                              />
+                              <span>
+                                {isDownloadingMihomoCore
+                                  ? '正在下载...'
+                                  : mihomoCoreInfo?.installed
+                                    ? '重新下载 Core'
+                                    : '下载 Core'}
+                              </span>
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            路径留空时使用上方自动下载的 Core；填写自定义路径时会优先使用自定义
+                            Core。
+                          </p>
+                        </div>
                         <input
                           type="text"
                           value={crawling.mihomoBinaryPath}
                           onChange={(e) => updateCrawlingDraft({ mihomoBinaryPath: e.target.value })}
-                          placeholder="留空则使用 resources/mihomo/{platform-arch}/mihomo"
+                          placeholder="留空则使用自动下载目录；也可以填写自定义 Mihomo Core 路径"
                           className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
                         />
                       </div>

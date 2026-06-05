@@ -23,6 +23,7 @@ import {
 } from '../shared/data-sharing'
 import type { AppUpdateApi, AppUpdateState } from '../shared/update'
 import {
+  isMihomoCoreInfo,
   isMihomoProxyNode,
   isMihomoRuntimeStatus,
   type MihomoApi
@@ -167,6 +168,8 @@ const dataSharing: DataSharingApi = {
 
 const mihomo: MihomoApi = {
   getStatus: () => invokeAccount('mihomo:get-status', [], isMihomoRuntimeStatus),
+  getCoreInfo: () => invokeAccount('mihomo:get-core-info', [], isMihomoCoreInfo),
+  downloadCore: () => invokeAccount('mihomo:download-core', [], isMihomoCoreInfo),
   refreshSubscription: () =>
     invokeAccount('mihomo:refresh-subscription', [], isMihomoRuntimeStatus),
   listNodes: () =>

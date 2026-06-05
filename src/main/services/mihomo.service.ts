@@ -1,13 +1,20 @@
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process'
 import { existsSync } from 'fs'
 import { chmod, mkdir, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import { app } from 'electron'
 import yaml from 'js-yaml'
 import { ProxyAgent } from 'undici'
 import type { Dispatcher } from 'undici'
+import { promisify } from 'util'
+import { gunzip as gunzipCallback, inflateRaw as inflateRawCallback } from 'zlib'
 import type { CrawlingSettings } from '../../shared/settings'
-import type { MihomoProxyNode, MihomoRuntimeStatus } from '../../shared/mihomo'
+import type { MihomoCoreInfo, MihomoProxyNode, MihomoRuntimeStatus } from '../../shared/mihomo'
+import {
+  MIHOMO_CORE_VERSION,
+  getMihomoCoreReleaseAsset,
+  getMihomoPlatformArch
+} from '../config/mihomo'
 import { getErrorMessage } from '../utils/error'
 import { sleep } from '../utils/time'
 import { getCrawlingSettings } from './settings.service'
@@ -33,6 +40,16 @@ const NODE_POOL_MAX_WAIT_SLICE_MS = 60_000
 const DEFAULT_TEST_TIMEOUT_MS = 8000
 const CORE_START_TIMEOUT_MS = 6000
 const CORE_START_POLL_INTERVAL_MS = 250
+const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50
+const ZIP_CENTRAL_DIRECTORY_FILE_HEADER_SIGNATURE = 0x02014b50
+const ZIP_LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50
+const ZIP_MIN_END_OF_CENTRAL_DIRECTORY_SIZE = 22
+const ZIP_MAX_COMMENT_SIZE = 65_535
+const ZIP_COMPRESSION_STORE = 0
+const ZIP_COMPRESSION_DEFLATE = 8
+
+const gunzip = promisify(gunzipCallback)
+const inflateRaw = promisify(inflateRawCallback)
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -409,14 +426,10 @@ function sanitizeNodeId(name: string, index: number): string {
 }
 
 function getDefaultMihomoBinaryPath(): string {
-  const executableName = process.platform === 'win32' ? 'mihomo.exe' : 'mihomo'
-  const platformArch = `${process.platform}-${process.arch}`
-
-  if (app.isPackaged) {
-    return join(process.resourcesPath, 'mihomo', platformArch, executableName)
-  }
-
-  return join(app.getAppPath(), 'resources', 'mihomo', platformArch, executableName)
+  const platformArch = getMihomoPlatformArch()
+  const asset = getMihomoCoreReleaseAsset(platformArch)
+  const executableName = asset?.executableName || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo')
+  return join(app.getPath('userData'), 'mihomo-core', MIHOMO_CORE_VERSION, platformArch, executableName)
 }
 
 async function ensureMihomoBinaryExecutable(binaryPath: string): Promise<void> {
@@ -441,6 +454,105 @@ function getMihomoSpawnErrorMessage(binaryPath: string, error: Error): string {
   }
 
   return `Mihomo Core 启动失败：${getErrorMessage(error)}`
+}
+
+function createMihomoCoreInfo(): MihomoCoreInfo {
+  const platformArch = getMihomoPlatformArch()
+  const asset = getMihomoCoreReleaseAsset(platformArch)
+  const defaultBinaryPath = getDefaultMihomoBinaryPath()
+
+  return {
+    version: MIHOMO_CORE_VERSION,
+    platformArch,
+    defaultBinaryPath,
+    downloadUrl: asset?.downloadUrl,
+    installed: existsSync(defaultBinaryPath),
+    supported: Boolean(asset)
+  }
+}
+
+function findZipEndOfCentralDirectory(buffer: Buffer): number {
+  const searchStart = Math.max(
+    0,
+    buffer.length - ZIP_MIN_END_OF_CENTRAL_DIRECTORY_SIZE - ZIP_MAX_COMMENT_SIZE
+  )
+
+  for (let offset = buffer.length - ZIP_MIN_END_OF_CENTRAL_DIRECTORY_SIZE; offset >= searchStart; offset--) {
+    if (buffer.readUInt32LE(offset) === ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE) {
+      return offset
+    }
+  }
+
+  throw new Error('Mihomo Core ZIP 解压失败：未找到中心目录。')
+}
+
+function getZipEntryDataOffset(buffer: Buffer, localHeaderOffset: number): number {
+  if (buffer.readUInt32LE(localHeaderOffset) !== ZIP_LOCAL_FILE_HEADER_SIGNATURE) {
+    throw new Error('Mihomo Core ZIP 解压失败：本地文件头无效。')
+  }
+
+  const fileNameLength = buffer.readUInt16LE(localHeaderOffset + 26)
+  const extraFieldLength = buffer.readUInt16LE(localHeaderOffset + 28)
+  return localHeaderOffset + 30 + fileNameLength + extraFieldLength
+}
+
+async function extractExecutableFromZip(
+  buffer: Buffer,
+  executableName: string
+): Promise<Buffer> {
+  const endOfCentralDirectoryOffset = findZipEndOfCentralDirectory(buffer)
+  const centralDirectorySize = buffer.readUInt32LE(endOfCentralDirectoryOffset + 12)
+  const centralDirectoryOffset = buffer.readUInt32LE(endOfCentralDirectoryOffset + 16)
+  const centralDirectoryEnd = centralDirectoryOffset + centralDirectorySize
+  let offset = centralDirectoryOffset
+
+  while (offset < centralDirectoryEnd) {
+    if (buffer.readUInt32LE(offset) !== ZIP_CENTRAL_DIRECTORY_FILE_HEADER_SIGNATURE) {
+      throw new Error('Mihomo Core ZIP 解压失败：中心目录文件头无效。')
+    }
+
+    const compressionMethod = buffer.readUInt16LE(offset + 10)
+    const compressedSize = buffer.readUInt32LE(offset + 20)
+    const fileNameLength = buffer.readUInt16LE(offset + 28)
+    const extraFieldLength = buffer.readUInt16LE(offset + 30)
+    const fileCommentLength = buffer.readUInt16LE(offset + 32)
+    const localHeaderOffset = buffer.readUInt32LE(offset + 42)
+    const fileName = buffer
+      .subarray(offset + 46, offset + 46 + fileNameLength)
+      .toString('utf-8')
+    const isExecutableEntry = basename(fileName).toLowerCase() === executableName.toLowerCase()
+
+    if (isExecutableEntry) {
+      const dataOffset = getZipEntryDataOffset(buffer, localHeaderOffset)
+      const compressedData = buffer.subarray(dataOffset, dataOffset + compressedSize)
+
+      if (compressionMethod === ZIP_COMPRESSION_STORE) {
+        return Buffer.from(compressedData)
+      }
+
+      if (compressionMethod === ZIP_COMPRESSION_DEFLATE) {
+        return await inflateRaw(compressedData)
+      }
+
+      throw new Error(`Mihomo Core ZIP 解压失败：不支持的压缩方式 ${compressionMethod}。`)
+    }
+
+    offset += 46 + fileNameLength + extraFieldLength + fileCommentLength
+  }
+
+  throw new Error(`Mihomo Core ZIP 解压失败：未找到 ${executableName}。`)
+}
+
+async function extractMihomoCoreArchive(
+  archive: Buffer,
+  archiveType: 'gzip' | 'zip',
+  executableName: string
+): Promise<Buffer> {
+  if (archiveType === 'gzip') {
+    return await gunzip(archive)
+  }
+
+  return await extractExecutableFromZip(archive, executableName)
 }
 
 function normalizeSubscriptionNode(rawNode: unknown, index: number): Record<string, unknown> | null {
@@ -539,6 +651,36 @@ class MihomoService {
 
   public listNodes(): MihomoProxyNode[] {
     return this.nodes.map((node) => ({ ...node }))
+  }
+
+  public getCoreInfo(): MihomoCoreInfo {
+    return createMihomoCoreInfo()
+  }
+
+  public async downloadCore(): Promise<MihomoCoreInfo> {
+    const platformArch = getMihomoPlatformArch()
+    const asset = getMihomoCoreReleaseAsset(platformArch)
+    if (!asset) {
+      throw new Error(`当前平台暂不支持自动下载 Mihomo Core：${platformArch}`)
+    }
+
+    const response = await fetch(asset.downloadUrl)
+    if (!response.ok) {
+      throw new Error(`Mihomo Core 下载失败，HTTP ${response.status}`)
+    }
+
+    const archive = Buffer.from(await response.arrayBuffer())
+    const executable = await extractMihomoCoreArchive(
+      archive,
+      asset.archiveType,
+      asset.executableName
+    )
+    const binaryPath = getDefaultMihomoBinaryPath()
+    await mkdir(dirname(binaryPath), { recursive: true })
+    await writeFile(binaryPath, executable)
+    await ensureMihomoBinaryExecutable(binaryPath)
+
+    return createMihomoCoreInfo()
   }
 
   public async refreshSubscription(
