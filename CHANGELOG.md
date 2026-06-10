@@ -4,6 +4,11 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-11
+
+- 新增“AMZ123”搜索词筛选任务
+- 新增“搜索词筛选”结果浏览页面
+
 ## [0.1.7] - 2026-06-06
 
 - 优化爬虫风控处理逻辑

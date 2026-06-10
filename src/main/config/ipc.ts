@@ -6,6 +6,16 @@ export const IPC_CHANNEL = {
     GET_STATUS: 'crawler:get-status',
     GET_AMAZON_COOKIES: 'crawler:get-amazon-cookies'
   },
+  AMAZON_SEARCH: {
+    GET_LOCAL_STATE: 'amazon-search:get-local-state',
+    SAVE_CONFIG: 'amazon-search:save-config',
+    REQUEST_LOGIN_CODE: 'amazon-search:request-login-code',
+    POLL_LOGIN_STATUS: 'amazon-search:poll-login-status',
+    LOGOUT: 'amazon-search:logout',
+    START_TASK: 'amazon-search:start-task',
+    STOP_TASK: 'amazon-search:stop-task',
+    GET_STATUS: 'amazon-search:get-status'
+  },
   DATABASE: {
     INIT: 'db:init',
     GET_TASKS: 'db:get-tasks',
@@ -14,6 +24,9 @@ export const IPC_CHANNEL = {
     DELETE_TASK: 'db:delete-task',
     QUERY_PRODUCTS: 'db:query-products',
     GET_PRODUCT_BSR_RANKS: 'db:get-product-bsr-ranks',
+    QUERY_SEARCH_KEYWORDS: 'db:query-search-keywords',
+    GET_SEARCH_KEYWORD_PRODUCTS: 'db:get-search-keyword-products',
+    MARK_SEARCH_KEYWORD_READ: 'db:mark-search-keyword-read',
     MARK_PRODUCT_READ: 'db:mark-product-read',
     DELETE_PRODUCTS: 'db:delete-products',
     GET_STATISTICS: 'db:get-statistics',
@@ -50,7 +63,10 @@ export const IPC_CHANNEL = {
     GET_REMOTE_CATEGORIES: 'data-sharing:get-remote-categories',
     GET_REMOTE_SELLER_TYPES: 'data-sharing:get-remote-seller-types',
     QUERY_REMOTE_PRODUCTS: 'data-sharing:query-remote-products',
+    QUERY_REMOTE_SEARCH_KEYWORDS: 'data-sharing:query-remote-search-keywords',
+    GET_REMOTE_SEARCH_KEYWORD_PRODUCTS: 'data-sharing:get-remote-search-keyword-products',
     GET_REMOTE_PRODUCT_BSR_RANKS: 'data-sharing:get-remote-product-bsr-ranks',
+    MARK_REMOTE_SEARCH_KEYWORD_READ: 'data-sharing:mark-remote-search-keyword-read',
     MARK_REMOTE_PRODUCT_READ: 'data-sharing:mark-remote-product-read'
   },
   ACCOUNT: {
@@ -80,5 +96,7 @@ export const IPC_CHANNEL = {
 export const WINDOW_CHANNEL = {
   CRAWLER_LOG_PROGRESS: 'crawler:log-progress',
   CRAWLER_STATE_UPDATE: 'crawler:state-update',
+  AMAZON_SEARCH_LOG_PROGRESS: 'amazon-search:log-progress',
+  AMAZON_SEARCH_STATE_UPDATE: 'amazon-search:state-update',
   UPDATE_STATE: 'update:state'
 } as const

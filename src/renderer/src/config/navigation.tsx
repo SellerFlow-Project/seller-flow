@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   Flame,
   LayoutGrid,
+  Search,
   Settings,
   Trash2
 } from 'lucide-react'
@@ -54,8 +55,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     children: [
       {
         key: 'amazon-collection',
-        title: '亚马逊采集',
+        title: '亚马逊排行榜',
         icon: <Flame className="w-4 h-4 text-orange-500" />,
+        requiredPermission: 'crawler:amazon'
+      },
+      {
+        key: 'amazon-search',
+        title: '亚马逊搜索词',
+        icon: <Search className="w-4 h-4 text-sky-500" />,
         requiredPermission: 'crawler:amazon'
       }
     ]
@@ -68,8 +75,14 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     children: [
       {
         key: 'data-browsing',
-        title: '数据浏览',
+        title: '排行榜数据浏览',
         icon: <Database className="w-4 h-4 text-blue-500" />,
+        requiredPermission: 'data:browse'
+      },
+      {
+        key: 'search-keyword-browsing',
+        title: '搜索词数据浏览',
+        icon: <Search className="w-4 h-4 text-sky-500" />,
         requiredPermission: 'data:browse'
       },
       {

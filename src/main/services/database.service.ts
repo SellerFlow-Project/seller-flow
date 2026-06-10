@@ -16,15 +16,20 @@ import {
 } from '../config/database'
 import type { CrawlTaskType } from '../types/crawler'
 import type {
+  AmazonSearchKeywordProductRow,
+  AmazonSearchKeywordRow,
   CrawledProductRow,
   CrawlTaskRow,
   CrawlTaskStatus,
   DatabaseStatistics,
+  IncomingAmazonSearchKeywordProduct,
+  IncomingAmazonSearchKeywordResult,
   IncomingCrawledProduct,
   PendingDeliveryDetailProduct,
   ProductBsrRankRow,
   ProductDeliveryDetailUpdate,
   ProductQueryFilter,
+  SearchKeywordQueryFilter,
   SellerSpriteAccountRow,
   SellerSpriteAccountStatus,
   SpriteAccountClearScope
@@ -38,9 +43,14 @@ export type {
   CrawlTaskRow,
   CrawlTaskStatus,
   DatabaseStatistics,
+  IncomingAmazonSearchKeywordProduct,
+  AmazonSearchKeywordProductRow,
+  AmazonSearchKeywordRow,
+  IncomingAmazonSearchKeywordResult,
   IncomingCrawledProduct,
   ParsedPrice,
   ProductQueryFilter,
+  SearchKeywordQueryFilter,
   ProductBsrRankRow,
   SellerSpriteAccountRow,
   SellerSpriteAccountStatus,
@@ -113,6 +123,14 @@ class DatabaseService {
       ).map((column) => column.name)
     )
 
+    const searchKeywordColumns = new Set(
+      (
+        db.prepare('PRAGMA table_info(amazon_search_keywords)').all() as Array<{
+          name: string
+        }>
+      ).map((column) => column.name)
+    )
+
     const missingColumns: Array<{ name: string; sql: string }> = [
       { name: 'seller_type', sql: 'ALTER TABLE crawled_products ADD COLUMN seller_type TEXT' },
       {
@@ -144,6 +162,12 @@ class DatabaseService {
       }
     }
 
+    if (!searchKeywordColumns.has('is_read')) {
+      db.exec(
+        `ALTER TABLE amazon_search_keywords ADD COLUMN is_read INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE}`
+      )
+    }
+
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_products_sellersprite_flag ON crawled_products(has_sellersprite_data);
       CREATE INDEX IF NOT EXISTS idx_products_delivery_detail_flag ON crawled_products(task_id, has_delivery_detail);
@@ -170,6 +194,49 @@ class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_bsr_task_id ON product_bsr_ranks(task_id);
       CREATE INDEX IF NOT EXISTS idx_bsr_id_rank ON product_bsr_ranks(bsr_id, rank);
       CREATE INDEX IF NOT EXISTS idx_bsr_is_main ON product_bsr_ranks(is_main);
+
+      CREATE TABLE IF NOT EXISTS amazon_search_keywords (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        keyword TEXT NOT NULL,
+        keyword_image_url TEXT,
+        filter_criteria TEXT NOT NULL,
+        matched_product_count INTEGER NOT NULL DEFAULT 0,
+        total_product_count INTEGER NOT NULL DEFAULT 0,
+        ranking_range TEXT NOT NULL,
+        fluctuation_range TEXT NOT NULL,
+        sellersprite_units_total INTEGER,
+        sellersprite_available_total INTEGER,
+        sellersprite_enriched_product_count INTEGER NOT NULL DEFAULT 0,
+        has_sellersprite_data INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(has_sellersprite_data IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
+        is_read INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(is_read IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
+        amz123_raw TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
+        UNIQUE(task_id, keyword)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_search_keywords_task_id ON amazon_search_keywords(task_id);
+      CREATE INDEX IF NOT EXISTS idx_search_keywords_keyword ON amazon_search_keywords(keyword);
+
+      CREATE TABLE IF NOT EXISTS amazon_search_keyword_products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        keyword_id INTEGER NOT NULL,
+        product_id INTEGER NOT NULL,
+        task_id INTEGER NOT NULL,
+        asin TEXT NOT NULL,
+        delivery_days INTEGER,
+        delivery_text TEXT,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+        FOREIGN KEY (keyword_id) REFERENCES amazon_search_keywords(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES crawled_products(id) ON DELETE CASCADE,
+        FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
+        UNIQUE(keyword_id, product_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_search_keyword_products_keyword_id ON amazon_search_keyword_products(keyword_id);
+      CREATE INDEX IF NOT EXISTS idx_search_keyword_products_product_id ON amazon_search_keyword_products(product_id);
+      CREATE INDEX IF NOT EXISTS idx_search_keyword_products_task_id ON amazon_search_keyword_products(task_id);
     `)
   }
 
@@ -190,7 +257,7 @@ class DatabaseService {
    * 新建一个采集任务日志
    * @returns 自动插入的自增 ID (作为主键)
    */
-  public createTask(taskName: string, taskType: CrawlTaskType, marketplace: string): number {
+  public createTask(taskName: string, taskType: CrawlTaskType | string, marketplace: string): number {
     const db = this.assertDb()
     const stmt = db.prepare(`
       INSERT INTO crawl_tasks (task_name, task_type, marketplace, status)
@@ -338,6 +405,144 @@ class DatabaseService {
     transaction(products)
   }
 
+  private resolveSearchKeywordProductCategory(
+    product: IncomingAmazonSearchKeywordProduct,
+    fallbackCategoryName: string
+  ): string {
+    const primaryBsr =
+      product.sellerSprite?.bsrList?.find((bsr) => bsr.main && (bsr.text || bsr.label)) ||
+      product.sellerSprite?.bsrList?.find((bsr) => bsr.text || bsr.label)
+
+    return primaryBsr?.text || primaryBsr?.label || fallbackCategoryName
+  }
+
+  public insertAmazonSearchKeywordResult(
+    taskId: number,
+    result: IncomingAmazonSearchKeywordResult
+  ): void {
+    const db = this.assertDb()
+    const categoryName = `搜索词 > ${result.keyword}`
+    const sellerspriteItems = result.products
+      .map((product) => product.sellerSprite)
+      .filter((sellerSprite): sellerSprite is NonNullable<typeof sellerSprite> =>
+        Boolean(sellerSprite)
+      )
+    const sellerspriteUnitsTotal = sellerspriteItems.reduce(
+      (sum, item) => sum + (item.units ?? 0),
+      0
+    )
+    const sellerspriteAvailableTotal = sellerspriteItems.reduce(
+      (sum, item) => sum + (item.available ?? 0),
+      0
+    )
+
+    for (const product of result.products) {
+      this.insertProducts(
+        taskId,
+        [product],
+        this.resolveSearchKeywordProductCategory(product, categoryName)
+      )
+    }
+
+    const upsertKeywordStmt = db.prepare(`
+      INSERT INTO amazon_search_keywords (
+        task_id,
+        keyword,
+        keyword_image_url,
+        filter_criteria,
+        matched_product_count,
+        total_product_count,
+        ranking_range,
+        fluctuation_range,
+        sellersprite_units_total,
+        sellersprite_available_total,
+        sellersprite_enriched_product_count,
+        has_sellersprite_data,
+        amz123_raw
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(task_id, keyword) DO UPDATE SET
+        keyword_image_url = excluded.keyword_image_url,
+        filter_criteria = excluded.filter_criteria,
+        matched_product_count = excluded.matched_product_count,
+        total_product_count = excluded.total_product_count,
+        ranking_range = excluded.ranking_range,
+        fluctuation_range = excluded.fluctuation_range,
+        sellersprite_units_total = excluded.sellersprite_units_total,
+        sellersprite_available_total = excluded.sellersprite_available_total,
+        sellersprite_enriched_product_count = excluded.sellersprite_enriched_product_count,
+        has_sellersprite_data = excluded.has_sellersprite_data,
+        amz123_raw = excluded.amz123_raw
+    `)
+    const selectKeywordIdStmt = db.prepare(`
+      SELECT id FROM amazon_search_keywords WHERE task_id = ? AND keyword = ?
+    `)
+    const selectProductIdStmt = db.prepare(`
+      SELECT id FROM crawled_products WHERE task_id = ? AND asin = ?
+    `)
+    const updateDeliveryStmt = db.prepare(`
+      UPDATE crawled_products
+      SET delivery_days = ?, has_delivery_detail = ?
+      WHERE id = ?
+    `)
+    const insertLinkStmt = db.prepare(`
+      INSERT INTO amazon_search_keyword_products (
+        keyword_id, product_id, task_id, asin, delivery_days, delivery_text
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(keyword_id, product_id) DO UPDATE SET
+        delivery_days = excluded.delivery_days,
+        delivery_text = excluded.delivery_text
+    `)
+
+    const transaction = db.transaction(() => {
+      upsertKeywordStmt.run(
+        taskId,
+        result.keyword,
+        result.keywordImage || '',
+        result.filterCriteria,
+        result.matchedProductCount,
+        result.totalProductCount,
+        result.rankingRange,
+        result.fluctuationRange,
+        sellerspriteItems.length > 0 ? sellerspriteUnitsTotal : null,
+        sellerspriteItems.length > 0 ? sellerspriteAvailableTotal : null,
+        sellerspriteItems.length,
+        sellerspriteItems.length > 0 ? SQLITE_BOOLEAN.TRUE : SQLITE_BOOLEAN.FALSE,
+        result.amz123Raw || null
+      )
+
+      const keywordRow = selectKeywordIdStmt.get(taskId, result.keyword) as
+        | { id: number }
+        | undefined
+
+      if (!keywordRow) {
+        throw new Error(`搜索词入库后未能找到记录: ${result.keyword}`)
+      }
+
+      for (const product of result.products) {
+        const asin = product.asin || ''
+        if (!asin) continue
+
+        const productRow = selectProductIdStmt.get(taskId, asin) as { id: number } | undefined
+        if (!productRow) continue
+
+        if (product.deliveryDays !== undefined && product.deliveryDays !== null) {
+          updateDeliveryStmt.run(String(product.deliveryDays), SQLITE_BOOLEAN.TRUE, productRow.id)
+        }
+
+        insertLinkStmt.run(
+          keywordRow.id,
+          productRow.id,
+          taskId,
+          asin,
+          product.deliveryDays ?? null,
+          product.deliveryText || null
+        )
+      }
+    })
+
+    transaction()
+  }
+
   public queryPendingDeliveryDetails(
     taskId: number,
     limit: number,
@@ -398,6 +603,17 @@ class DatabaseService {
       WHERE id = ?
     `)
     const result = stmt.run(SQLITE_BOOLEAN.TRUE, productId)
+    return result.changes > 0
+  }
+
+  public markAmazonSearchKeywordAsRead(keywordId: number): boolean {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      UPDATE amazon_search_keywords
+      SET is_read = ?
+      WHERE id = ?
+    `)
+    const result = stmt.run(SQLITE_BOOLEAN.TRUE, keywordId)
     return result.changes > 0
   }
 
@@ -540,6 +756,96 @@ class DatabaseService {
     const list = listStmt.all(...listParams) as CrawledProductRow[]
 
     return { total, list }
+  }
+
+  public queryAmazonSearchKeywords(
+    filter?: SearchKeywordQueryFilter
+  ): { total: number; list: AmazonSearchKeywordRow[] } {
+    const db = this.assertDb()
+    const params: Array<string | number> = []
+    const whereClauses: string[] = []
+
+    if (filter?.taskId) {
+      whereClauses.push('k.task_id = ?')
+      params.push(filter.taskId)
+    }
+
+    const whereStr = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
+    const productCountSql = `
+      SELECT COUNT(DISTINCT scoped_kp.product_id)
+      FROM amazon_search_keyword_products scoped_kp
+      WHERE scoped_kp.keyword_id = k.id
+    `
+    const firstImageSql = `
+      SELECT scoped_p.image_url
+      FROM amazon_search_keyword_products scoped_kp
+      JOIN crawled_products scoped_p ON scoped_p.id = scoped_kp.product_id
+      WHERE scoped_kp.keyword_id = k.id
+        AND scoped_p.image_url IS NOT NULL
+        AND scoped_p.image_url != ''
+      ORDER BY scoped_kp.id ASC
+      LIMIT 1
+    `
+    const total = (
+      db
+        .prepare(
+          `
+          SELECT COUNT(*) AS total
+          FROM amazon_search_keywords k
+          ${whereStr}
+        `
+        )
+        .get(...params) as { total: number }
+    ).total
+    const sortOrder =
+      filter?.sortOrder === PRODUCT_SORT_ORDER.ASC || filter?.sortOrder === PRODUCT_SORT_ORDER.DESC
+        ? filter.sortOrder
+        : PRODUCT_SORT_ORDER.DESC
+    const limit = filter?.limit ?? PRODUCT_QUERY_DEFAULT.LIMIT
+    const offset = filter?.offset ?? PRODUCT_QUERY_DEFAULT.OFFSET
+    const list = db
+      .prepare(
+        `
+        SELECT
+          k.id,
+          k.task_id,
+          k.keyword,
+          k.keyword_image_url,
+          COALESCE(NULLIF(k.keyword_image_url, ''), (${firstImageSql})) AS first_product_image_url,
+          k.matched_product_count,
+          (${productCountSql}) AS linked_product_count,
+          k.is_read,
+          k.created_at,
+          t.marketplace
+        FROM amazon_search_keywords k
+        JOIN crawl_tasks t ON t.id = k.task_id
+        ${whereStr}
+        ORDER BY k.created_at ${sortOrder}
+        LIMIT ? OFFSET ?
+      `
+      )
+      .all(...params, limit, offset) as AmazonSearchKeywordRow[]
+
+    return { total, list }
+  }
+
+  public queryAmazonSearchKeywordProducts(keywordId: number): AmazonSearchKeywordProductRow[] {
+    const db = this.assertDb()
+    const stmt = db.prepare(`
+      SELECT
+        p.*,
+        kp.keyword_id,
+        k.keyword,
+        kp.delivery_text,
+        kp.delivery_days AS keyword_delivery_days
+      FROM amazon_search_keyword_products kp
+      JOIN amazon_search_keywords k ON k.id = kp.keyword_id
+      JOIN crawled_products p ON p.id = kp.product_id
+      WHERE kp.keyword_id = ?
+      ORDER BY p.crawled_at DESC, p.id DESC
+    `)
+
+    return stmt.all(keywordId) as AmazonSearchKeywordProductRow[]
   }
 
   /**

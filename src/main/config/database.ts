@@ -131,6 +131,49 @@ export const DATABASE_SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_bsr_id_rank ON product_bsr_ranks(bsr_id, rank);
   CREATE INDEX IF NOT EXISTS idx_bsr_is_main ON product_bsr_ranks(is_main);
 
+  CREATE TABLE IF NOT EXISTS amazon_search_keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL,
+    keyword TEXT NOT NULL,
+    keyword_image_url TEXT,
+    filter_criteria TEXT NOT NULL,
+    matched_product_count INTEGER NOT NULL DEFAULT 0,
+    total_product_count INTEGER NOT NULL DEFAULT 0,
+    ranking_range TEXT NOT NULL,
+    fluctuation_range TEXT NOT NULL,
+    sellersprite_units_total INTEGER,
+    sellersprite_available_total INTEGER,
+    sellersprite_enriched_product_count INTEGER NOT NULL DEFAULT 0,
+    has_sellersprite_data INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(has_sellersprite_data IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
+    is_read INTEGER NOT NULL DEFAULT ${SQLITE_BOOLEAN.FALSE} CHECK(is_read IN (${SQLITE_BOOLEAN.FALSE}, ${SQLITE_BOOLEAN.TRUE})),
+    amz123_raw TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
+    UNIQUE(task_id, keyword)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_search_keywords_task_id ON amazon_search_keywords(task_id);
+  CREATE INDEX IF NOT EXISTS idx_search_keywords_keyword ON amazon_search_keywords(keyword);
+
+  CREATE TABLE IF NOT EXISTS amazon_search_keyword_products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    keyword_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    task_id INTEGER NOT NULL,
+    asin TEXT NOT NULL,
+    delivery_days INTEGER,
+    delivery_text TEXT,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    FOREIGN KEY (keyword_id) REFERENCES amazon_search_keywords(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES crawled_products(id) ON DELETE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES crawl_tasks(id) ON DELETE CASCADE,
+    UNIQUE(keyword_id, product_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_search_keyword_products_keyword_id ON amazon_search_keyword_products(keyword_id);
+  CREATE INDEX IF NOT EXISTS idx_search_keyword_products_product_id ON amazon_search_keyword_products(product_id);
+  CREATE INDEX IF NOT EXISTS idx_search_keyword_products_task_id ON amazon_search_keyword_products(task_id);
+
   CREATE TABLE IF NOT EXISTS sellersprite_accounts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,

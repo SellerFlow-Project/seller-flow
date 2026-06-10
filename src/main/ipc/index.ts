@@ -1,4 +1,5 @@
 import { registerAccountIPC } from './account.ipc'
+import { registerAmazonSearchIPC } from './amazon-search.ipc'
 import { registerDatabaseIPC } from './database.ipc'
 import { registerDataSharingIPC } from './data-sharing.ipc'
 import { registerCrawlerIPC } from './crawler.ipc'
@@ -16,6 +17,7 @@ import { mihomoService } from '../services/mihomo.service'
  */
 export function registerAllIPC(): void {
   registerAccountIPC()
+  registerAmazonSearchIPC()
   registerDatabaseIPC()
   registerDataSharingIPC()
   registerCrawlerIPC()
@@ -27,6 +29,6 @@ export function registerAllIPC(): void {
   void dataSharingService.applySettings(settings.dataSharing)
   void mihomoService.applySettings(settings.crawling)
   console.log(
-    '[IPC] 账号、数据库、数据共享、Mihomo、爬虫、卖家精灵、设置与更新服务的所有 IPC 消息管道注册完毕。'
+    '[IPC] 账号、亚马逊搜索词、数据库、数据共享、Mihomo、爬虫、卖家精灵、设置与更新服务的所有 IPC 消息管道注册完毕。'
   )
 }

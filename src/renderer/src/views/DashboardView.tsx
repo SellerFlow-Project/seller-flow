@@ -61,7 +61,7 @@ export const DashboardView: React.FC = () => {
                 采集排行榜商品数据、关键词筛选等等。
               </p>
               <div className="flex items-center justify-between pt-3 border-t border-border text-[11px] font-bold text-primary">
-                <span>进入亚马逊采集</span>
+                <span>进入亚马逊排行榜</span>
                 <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
               </div>
             </button>

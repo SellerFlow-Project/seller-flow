@@ -18,6 +18,14 @@ export interface DataSharingProductQueryFilter {
   hasSellerSpriteData?: boolean
 }
 
+export interface DataSharingSearchKeywordQueryFilter {
+  taskId?: number
+  limit?: number
+  offset?: number
+  sortBy?: string
+  sortOrder?: DataSharingSortOrder
+}
+
 export interface SharedDataSource {
   id: string
   name: string
@@ -49,7 +57,19 @@ export interface DataSharingApi {
     source: SharedDataSource,
     filter: DataSharingProductQueryFilter
   ) => Promise<{ total: number; list: unknown[] }>
+  queryRemoteSearchKeywords: (
+    source: SharedDataSource,
+    filter: DataSharingSearchKeywordQueryFilter
+  ) => Promise<{ total: number; list: unknown[] }>
+  getRemoteSearchKeywordProducts: (
+    source: SharedDataSource,
+    keywordId: number
+  ) => Promise<unknown[]>
   getRemoteProductBsrRanks: (source: SharedDataSource, productId: number) => Promise<unknown[]>
+  markRemoteSearchKeywordAsRead: (
+    source: SharedDataSource,
+    keywordId: number
+  ) => Promise<boolean>
   markRemoteProductAsRead: (source: SharedDataSource, productId: number) => Promise<boolean>
 }
 

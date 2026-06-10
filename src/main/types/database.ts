@@ -34,6 +34,14 @@ export interface ProductQueryFilter {
   hasSellerSpriteData?: boolean
 }
 
+export interface SearchKeywordQueryFilter {
+  taskId?: number
+  limit?: number
+  offset?: number
+  sortBy?: string
+  sortOrder?: ProductSortOrder
+}
+
 export interface ProductBsrRankInput {
   rank: number
   main: boolean
@@ -58,6 +66,23 @@ export interface IncomingCrawledProduct {
   image?: string
   productUrl?: string
   sellerSprite?: ProductSellerSpriteData
+}
+
+export interface IncomingAmazonSearchKeywordProduct extends IncomingCrawledProduct {
+  deliveryDays?: number | null
+  deliveryText?: string
+}
+
+export interface IncomingAmazonSearchKeywordResult {
+  keyword: string
+  keywordImage?: string
+  filterCriteria: string
+  matchedProductCount: number
+  totalProductCount: number
+  rankingRange: string
+  fluctuationRange: string
+  amz123Raw?: string
+  products: IncomingAmazonSearchKeywordProduct[]
 }
 
 export interface CrawlTaskRow {
@@ -117,6 +142,26 @@ export interface ProductBsrRankRow {
   text: string
   href: string
   created_at: string
+}
+
+export interface AmazonSearchKeywordRow {
+  id: number
+  task_id: number
+  keyword: string
+  keyword_image_url?: string | null
+  first_product_image_url?: string | null
+  matched_product_count: number
+  linked_product_count: number
+  is_read: SqliteBoolean
+  created_at: string
+  marketplace: string
+}
+
+export interface AmazonSearchKeywordProductRow extends CrawledProductRow {
+  keyword_id: number
+  keyword: string
+  delivery_text?: string | null
+  keyword_delivery_days?: number | null
 }
 
 export interface DatabaseStatistics {

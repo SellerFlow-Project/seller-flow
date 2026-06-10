@@ -8,6 +8,7 @@ import {
   DATA_SHARING_PROTOCOL_VERSION,
   DATA_SHARING_SERVICE_TYPE,
   type DataSharingProductQueryFilter,
+  type DataSharingSearchKeywordQueryFilter,
   type DataSharingStatus,
   type SharedDataSource
 } from '../../shared/data-sharing'
@@ -239,6 +240,66 @@ class DataSharingService {
     return response.list || []
   }
 
+  public async queryRemoteSearchKeywords(
+    source: SharedDataSource,
+    filter: DataSharingSearchKeywordQueryFilter
+  ): Promise<{ total: number; list: unknown[] }> {
+    const response = await fetchJson<{
+      success: boolean
+      total?: number
+      list?: unknown[]
+      error?: string
+    }>(`${normalizeRemoteBaseUrl(source)}/search-keywords/query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(filter)
+    })
+
+    if (!response.success) {
+      throw new Error(response.error || '远端搜索词数据读取失败。')
+    }
+
+    return {
+      total: response.total || 0,
+      list: response.list || []
+    }
+  }
+
+  public async getRemoteSearchKeywordProducts(
+    source: SharedDataSource,
+    keywordId: number
+  ): Promise<unknown[]> {
+    const response = await fetchJson<{ success: boolean; list?: unknown[]; error?: string }>(
+      `${normalizeRemoteBaseUrl(source)}/search-keywords/${keywordId}/products`
+    )
+
+    if (!response.success) {
+      throw new Error(response.error || '远端搜索词商品列表读取失败。')
+    }
+
+    return response.list || []
+  }
+
+  public async markRemoteSearchKeywordAsRead(
+    source: SharedDataSource,
+    keywordId: number
+  ): Promise<boolean> {
+    const response = await fetchJson<{ success: boolean; updated?: boolean; error?: string }>(
+      `${normalizeRemoteBaseUrl(source)}/search-keywords/${keywordId}/read`,
+      {
+        method: 'PATCH'
+      }
+    )
+
+    if (!response.success) {
+      throw new Error(response.error || '远端搜索词已读状态更新失败。')
+    }
+
+    return Boolean(response.updated)
+  }
+
   public async markRemoteProductAsRead(
     source: SharedDataSource,
     productId: number
@@ -365,6 +426,41 @@ class DataSharingService {
         res.json({
           success: true,
           ...databaseService.queryProducts(req.body as DataSharingProductQueryFilter)
+        })
+      } catch (error) {
+        sendJsonError(res, error)
+      }
+    })
+
+    api.post(`${DATA_SHARING_API_PREFIX}/search-keywords/query`, (req: Request, res: Response) => {
+      try {
+        res.json({
+          success: true,
+          ...databaseService.queryAmazonSearchKeywords(
+            req.body as DataSharingSearchKeywordQueryFilter
+          )
+        })
+      } catch (error) {
+        sendJsonError(res, error)
+      }
+    })
+
+    api.get(`${DATA_SHARING_API_PREFIX}/search-keywords/:keywordId/products`, (req, res) => {
+      try {
+        res.json({
+          success: true,
+          list: databaseService.queryAmazonSearchKeywordProducts(toNumber(req.params.keywordId, 0))
+        })
+      } catch (error) {
+        sendJsonError(res, error)
+      }
+    })
+
+    api.patch(`${DATA_SHARING_API_PREFIX}/search-keywords/:keywordId/read`, (req, res) => {
+      try {
+        res.json({
+          success: true,
+          updated: databaseService.markAmazonSearchKeywordAsRead(toNumber(req.params.keywordId, 0))
         })
       } catch (error) {
         sendJsonError(res, error)

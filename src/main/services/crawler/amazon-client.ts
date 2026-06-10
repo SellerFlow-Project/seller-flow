@@ -254,9 +254,14 @@ export class AmazonClient {
     }
   }
 
-  public async fetchHtml(url: string, cookies: string, signal?: AbortSignal): Promise<string> {
+  public async fetchHtml(
+    url: string,
+    cookies: string,
+    signal?: AbortSignal,
+    scopeOverride?: AmazonRequestScope
+  ): Promise<string> {
     let lastFailure: AmazonRequestFailure | undefined
-    const requestScope = getAmazonRequestScope(url)
+    const requestScope = scopeOverride || getAmazonRequestScope(url)
 
     for (let attempt = 1; attempt <= AMAZON_RISK_CONTROL_RETRY_POLICY.MAX_ATTEMPTS; attempt++) {
       const dispatcher = await mihomoService.getFetchDispatcher(requestScope, signal)

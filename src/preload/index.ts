@@ -28,6 +28,15 @@ import {
   isMihomoRuntimeStatus,
   type MihomoApi
 } from '../shared/mihomo'
+import {
+  isAmz123LoginCode,
+  isAmz123LoginStatus,
+  isAmazonSearchConfig,
+  isAmazonSearchLocalState,
+  isAmazonSearchStatus,
+  type AmazonSearchApi,
+  type AmazonSearchStatus
+} from '../shared/amazon-search'
 
 // Custom APIs for renderer
 const updates: AppUpdateApi = {
@@ -160,8 +169,14 @@ const dataSharing: DataSharingApi = {
     invokeAccount('data-sharing:get-remote-seller-types', [source, taskId]),
   queryRemoteProducts: (source, filter) =>
     invokeAccount('data-sharing:query-remote-products', [source, filter]),
+  queryRemoteSearchKeywords: (source, filter) =>
+    invokeAccount('data-sharing:query-remote-search-keywords', [source, filter]),
+  getRemoteSearchKeywordProducts: (source, keywordId) =>
+    invokeAccount('data-sharing:get-remote-search-keyword-products', [source, keywordId]),
   getRemoteProductBsrRanks: (source, productId) =>
     invokeAccount('data-sharing:get-remote-product-bsr-ranks', [source, productId]),
+  markRemoteSearchKeywordAsRead: (source, keywordId) =>
+    invokeAccount('data-sharing:mark-remote-search-keyword-read', [source, keywordId]),
   markRemoteProductAsRead: (source, productId) =>
     invokeAccount('data-sharing:mark-remote-product-read', [source, productId])
 }
@@ -182,8 +197,43 @@ const mihomo: MihomoApi = {
   testNode: (nodeId) => invokeAccount('mihomo:test-node', [nodeId], isMihomoProxyNode)
 }
 
+const amazonSearch: AmazonSearchApi = {
+  getLocalState: () =>
+    invokeAccount('amazon-search:get-local-state', [], isAmazonSearchLocalState),
+  saveConfig: (config) =>
+    invokeAccount('amazon-search:save-config', [config], isAmazonSearchConfig),
+  requestLoginCode: () =>
+    invokeAccount('amazon-search:request-login-code', [], isAmz123LoginCode),
+  pollLoginStatus: (ticket) =>
+    invokeAccount('amazon-search:poll-login-status', [ticket], isAmz123LoginStatus),
+  logout: () => invokeAccount('amazon-search:logout', []),
+  startTask: (config) => invokeAccount('amazon-search:start-task', [config]),
+  stopTask: () => invokeAccount('amazon-search:stop-task', []),
+  getStatus: () => invokeAccount('amazon-search:get-status', [], isAmazonSearchStatus),
+  onLog: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, log: string): void => {
+      callback(log)
+    }
+
+    ipcRenderer.on('amazon-search:log-progress', listener)
+    return () => ipcRenderer.removeListener('amazon-search:log-progress', listener)
+  },
+  onStateChange: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      state: AmazonSearchStatus
+    ): void => {
+      callback(state)
+    }
+
+    ipcRenderer.on('amazon-search:state-update', listener)
+    return () => ipcRenderer.removeListener('amazon-search:state-update', listener)
+  }
+}
+
 const api = {
   account,
+  amazonSearch,
   dataSharing,
   mihomo,
   settings,

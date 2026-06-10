@@ -40,6 +40,7 @@ export const AMAZON_RISK_CONTROL_HTTP_STATUS = new Set([403, 429, 503])
 export const AMAZON_RISK_CONTROL_HTML_MARKERS = [
   'api-services-support@amazon.com',
   'to discuss automated access to amazon data please contact',
+  'ご迷惑をおかけしています',
   'enter the characters you see below',
   'type the characters you see in this image',
   '画像に表示されている文字を入力してください',

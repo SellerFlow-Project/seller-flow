@@ -3,6 +3,7 @@ import { IPC_CHANNEL } from '../config/ipc'
 import { databaseService } from '../services/database.service'
 import type {
   ProductQueryFilter,
+  SearchKeywordQueryFilter,
   SellerSpriteAccountStatus,
   SpriteAccountClearScope
 } from '../types/database'
@@ -58,6 +59,21 @@ export function registerDatabaseIPC(): void {
 
   handleIpc(IPC_CHANNEL.DATABASE.GET_PRODUCT_BSR_RANKS, (_event, productId: number) => {
     return createIpcSuccess({ list: databaseService.queryProductBsrRanks(productId) })
+  })
+
+  handleIpc(
+    IPC_CHANNEL.DATABASE.QUERY_SEARCH_KEYWORDS,
+    (_event, filter: SearchKeywordQueryFilter | undefined) => {
+      return createIpcSuccess(databaseService.queryAmazonSearchKeywords(filter))
+    }
+  )
+
+  handleIpc(IPC_CHANNEL.DATABASE.GET_SEARCH_KEYWORD_PRODUCTS, (_event, keywordId: number) => {
+    return createIpcSuccess({ list: databaseService.queryAmazonSearchKeywordProducts(keywordId) })
+  })
+
+  handleIpc(IPC_CHANNEL.DATABASE.MARK_SEARCH_KEYWORD_READ, (_event, keywordId: number) => {
+    return createIpcSuccess({ updated: databaseService.markAmazonSearchKeywordAsRead(keywordId) })
   })
 
   handleIpc(IPC_CHANNEL.DATABASE.MARK_PRODUCT_READ, (_event, productId: number) => {

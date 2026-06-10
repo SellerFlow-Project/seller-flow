@@ -15,8 +15,13 @@ import {
 } from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 import type { SharedDataSource } from '../../../shared/data-sharing'
+import { CRAWL_TASK_TYPE } from '../../../shared/crawler'
 
 const LOCAL_DATA_SOURCE_ID = 'local'
+const RANKING_TASK_TYPES = new Set<string>([
+  CRAWL_TASK_TYPE.BEST_SELLERS,
+  CRAWL_TASK_TYPE.NEW_RELEASES
+])
 
 // 采集任务接口定义
 interface CrawlTask {
@@ -56,6 +61,10 @@ interface CategoryNode {
   name: string
   fullPath: string
   children: Map<string, CategoryNode>
+}
+
+function isRankingCrawlTask(task: CrawlTask): boolean {
+  return RANKING_TASK_TYPES.has(task.task_type)
 }
 
 export const DataBrowsing: React.FC = () => {
@@ -186,11 +195,13 @@ export const DataBrowsing: React.FC = () => {
           ? ((await window.api.dataSharing.getRemoteTasks(selectedRemoteDataSource)) as CrawlTask[])
           : []
 
-      setTasks(list)
-      if (list.length > 0) {
-        const exists = list.some((task) => task.id === selectedTaskId)
+      const rankingTasks = list.filter(isRankingCrawlTask)
+
+      setTasks(rankingTasks)
+      if (rankingTasks.length > 0) {
+        const exists = rankingTasks.some((task) => task.id === selectedTaskId)
         if (!keepSelection || !selectedTaskId || !exists) {
-          setSelectedTaskId(list[0].id)
+          setSelectedTaskId(rankingTasks[0].id)
         }
       } else {
         setSelectedTaskId('')
@@ -545,7 +556,7 @@ export const DataBrowsing: React.FC = () => {
             <span className="p-1.5 bg-primary/10 text-primary rounded">
               <Database className="w-5 h-5 animate-pulse" />
             </span>
-            <h2 className="text-xl font-bold text-foreground">数据浏览 (Data Browsing)</h2>
+            <h2 className="text-xl font-bold text-foreground">排行榜数据浏览</h2>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             浏览与检索数据库中保存的亚马逊商品采集明细
@@ -638,7 +649,7 @@ export const DataBrowsing: React.FC = () => {
                   )
                 })}
                 {tasks.length === 0 && !isLoadingTasks && (
-                  <option value="">-- 当前尚无采集数据，请先去采集 --</option>
+                  <option value="">-- 当前尚无排行榜采集数据，请先去采集 --</option>
                 )}
               </select>
             </div>
@@ -662,7 +673,7 @@ export const DataBrowsing: React.FC = () => {
           <div className="max-w-md space-y-2">
             <h3 className="text-lg font-bold text-foreground">暂无采集任务</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              本地数据库中目前没有任何抓取任务记录。请前往左侧菜单的“亚马逊采集”页面，新建并开启一个爬虫任务，成功采集后即可在此浏览多级类目下的商品！
+              当前数据源中目前没有任何排行榜采集任务记录。请前往左侧菜单的“亚马逊采集”页面，新建并开启一个排行榜爬虫任务，成功采集后即可在此浏览多级类目下的商品！
             </p>
           </div>
         </div>
