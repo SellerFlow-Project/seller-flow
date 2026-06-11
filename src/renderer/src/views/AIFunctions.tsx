@@ -54,7 +54,8 @@ const crawledProducts: SeedProduct[] = [
       '底座轮滑采用静音PU，对地板零刮伤'
     ],
     listingSamples: {
-      title: '✨ [高级蓝海爆款标题 - 精英说服力风格] ✨\n【Upgraded】Wireless Ergonomic Office Chair with Dynamic Lumbar Support - Adjustable 3D Armrest Mesh High Back Computer Desk Chair, Breathable Cushion & Smooth Caster Wheels for Home Office Study (Slate Grey)',
+      title:
+        '✨ [高级蓝海爆款标题 - 精英说服力风格] ✨\n【Upgraded】Wireless Ergonomic Office Chair with Dynamic Lumbar Support - Adjustable 3D Armrest Mesh High Back Computer Desk Chair, Breathable Cushion & Smooth Caster Wheels for Home Office Study (Slate Grey)',
       bullets: [
         '1. 【DYNAMIC LUMBAR ADAPTATION】Equipped with responsive lumbar tracking that adjusts dynamically to your movement, reducing spine fatigue by 85% during extended work sessions.',
         '2. 【BREATHABLE SLATE MESH】Engineered from high-elasticity German mesh fabric that provides ultimate ventilation, avoiding sweat accumulation even in warm summer climates.',
@@ -83,7 +84,8 @@ const crawledProducts: SeedProduct[] = [
       '风扇散热静音优化，分贝仪实测低于 28dB'
     ],
     listingSamples: {
-      title: '✨ [超清4K激光投影 - 极客智能创意型] ✨\n【Native 4K】4K UltraHD Mini Projector with WiFi 6 & Bluetooth 5.2 - Portable Home Movie Projector Support Auto Keystone, 180 Degree Rotatable Gimbal & Smart Android TV for Bedroom/Outdoor (Carbon Black)',
+      title:
+        '✨ [超清4K激光投影 - 极客智能创意型] ✨\n【Native 4K】4K UltraHD Mini Projector with WiFi 6 & Bluetooth 5.2 - Portable Home Movie Projector Support Auto Keystone, 180 Degree Rotatable Gimbal & Smart Android TV for Bedroom/Outdoor (Carbon Black)',
       bullets: [
         '1. 【NATIVE 4K ULTRA GRAPHICS】Delivers true native 4K cinema resolution with 850 ANSI lumens of brightness and 15000:1 contrast ratio, bringing breathtaking details to life.',
         '2. 【WIFI 6 INSTANT CAST】Equipped with latest ultra-low latency WiFi 6 chipset for seamless wireless mirroring of iOS, Android, and laptop screens with zero lagging.',
@@ -111,7 +113,8 @@ const crawledProducts: SeedProduct[] = [
       '支持 Nespresso 原装胶囊与手工咖啡粉双模冲调'
     ],
     listingSamples: {
-      title: '✨ [至臻奢享浓缩咖啡机 - 专业意式工艺型] ✨\n【20 Bar Precision】Portable Espresso Machine 20 Bar Pressure - Handheld Espresso Maker with USB & 12V Car Charger, Rechargeable Travel Espresso Cup Compatible with Pods & Ground Coffee (Espresso Brown)',
+      title:
+        '✨ [至臻奢享浓缩咖啡机 - 专业意式工艺型] ✨\n【20 Bar Precision】Portable Espresso Machine 20 Bar Pressure - Handheld Espresso Maker with USB & 12V Car Charger, Rechargeable Travel Espresso Cup Compatible with Pods & Ground Coffee (Espresso Brown)',
       bullets: [
         '1. 【20 BAR STABLE EXTRACTION】Engineered with premium Italian high-pressure electromagnetic pump, outputting 20-bar stable pressure to extract thick, golden crema effortlessly.',
         '2. 【DUAL POWER HEATING】Equipped with micro-thermostat heating element, powered via standard 5V USB output for slow charging, or 12V car cigarette lighter for instant 5-minute heating.',
@@ -135,7 +138,9 @@ export const AIFunctions: React.FC = () => {
 
   // Listing Generation States (Inside Node 3)
   const [listingTab, setListingTab] = useState<'title' | 'bullets' | 'desc'>('title')
-  const [selectedTone, setSelectedTone] = useState<'persuasive' | 'professional' | 'creative'>('persuasive')
+  const [selectedTone, setSelectedTone] = useState<'persuasive' | 'professional' | 'creative'>(
+    'persuasive'
+  )
   const [isGenerating, setIsGenerating] = useState(false)
   const [listingTitle, setListingTitle] = useState(currentProduct.listingSamples.title)
   const [listingBullets, setListingBullets] = useState(currentProduct.listingSamples.bullets)
@@ -167,7 +172,7 @@ export const AIFunctions: React.FC = () => {
   const handleProductChange = (index: number) => {
     setSelectedProductIndex(index)
     const newProduct = crawledProducts[index]
-    
+
     // Update listing contents
     setListingTitle(newProduct.listingSamples.title)
     setListingBullets(newProduct.listingSamples.bullets)
@@ -211,11 +216,11 @@ export const AIFunctions: React.FC = () => {
             : '💡 [极客先锋创意风格]'
 
       if (listingTab === 'title') {
-        setListingTitle(`${tonePrefix}\n${currentProduct.listingSamples.title.replace(/✨.*✨\n/, '')}`)
-      } else if (listingTab === 'bullets') {
-        setListingBullets(
-          currentProduct.listingSamples.bullets.map((b) => `${tonePrefix} ${b}`)
+        setListingTitle(
+          `${tonePrefix}\n${currentProduct.listingSamples.title.replace(/✨.*✨\n/, '')}`
         )
+      } else if (listingTab === 'bullets') {
+        setListingBullets(currentProduct.listingSamples.bullets.map((b) => `${tonePrefix} ${b}`))
       } else {
         setListingDesc(`${tonePrefix}\n\n${currentProduct.listingSamples.desc}`)
       }
@@ -267,18 +272,34 @@ export const AIFunctions: React.FC = () => {
   // Workflow Nodes Metadata
   const workflowNodes = [
     { id: 1, name: '数据源联动', sub: 'Crawled Ingest', icon: Database, color: 'text-blue-500' },
-    { id: 2, name: '痛点语义分析', sub: 'Sentiment Analysis', icon: Sliders, color: 'text-violet-500' },
-    { id: 3, name: 'SEO Listing生成', sub: 'Listing Copilot', icon: Sparkles, color: 'text-indigo-500' },
-    { id: 4, name: '营销配图绘制', sub: 'Diffusion Image', icon: ImageIcon, color: 'text-emerald-500' },
+    {
+      id: 2,
+      name: '痛点语义分析',
+      sub: 'Sentiment Analysis',
+      icon: Sliders,
+      color: 'text-violet-500'
+    },
+    {
+      id: 3,
+      name: 'SEO Listing生成',
+      sub: 'Listing Copilot',
+      icon: Sparkles,
+      color: 'text-indigo-500'
+    },
+    {
+      id: 4,
+      name: '营销配图绘制',
+      sub: 'Diffusion Image',
+      icon: ImageIcon,
+      color: 'text-emerald-500'
+    },
     { id: 5, name: '一键上架与部署', sub: 'ERP Publisher', icon: Globe, color: 'text-rose-500' }
   ]
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50 dark:bg-black">
-      
       {/* 🚀 Top Section: Seed Product Database Linkage Selector */}
       <div className="bg-card text-card-foreground border border-border rounded-xl p-5 grid grid-cols-1 lg:grid-cols-12 items-center gap-5 shadow-xs shrink-0">
-        
         {/* Left Side: Description Text (lg:col-span-7) */}
         <div className="lg:col-span-7 space-y-1">
           <div className="flex items-center space-x-2">
@@ -286,7 +307,9 @@ export const AIFunctions: React.FC = () => {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <h2 className="font-extrabold text-sm text-foreground">SQLite 采集数据源双向联动控制</h2>
+            <h2 className="font-extrabold text-sm text-foreground">
+              SQLite 采集数据源双向联动控制
+            </h2>
           </div>
           <p className="text-[11px] text-muted-foreground leading-normal">
             从已完成爬行的亚马逊 SQLite 本地库中直接读取商品作为 AI 优化的爆款母体，打破孤岛数据屏障
@@ -295,7 +318,9 @@ export const AIFunctions: React.FC = () => {
 
         {/* Right Side: Product Selector buttons (lg:col-span-5) */}
         <div className="lg:col-span-5 flex flex-col sm:flex-row sm:items-center lg:justify-end gap-3 w-full min-w-0">
-          <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold shrink-0">选择联动母体 ASIN:</span>
+          <span className="text-xs text-slate-500 dark:text-zinc-400 font-bold shrink-0">
+            选择联动母体 ASIN:
+          </span>
           <div className="grid grid-cols-3 gap-1.5 w-full sm:w-auto min-w-0">
             {crawledProducts.map((p, index) => {
               const isSelected = selectedProductIndex === index
@@ -310,9 +335,7 @@ export const AIFunctions: React.FC = () => {
                   }`}
                   title={p.title}
                 >
-                  <span className="font-mono text-[9px] font-bold">
-                    {p.asin}
-                  </span>
+                  <span className="font-mono text-[9px] font-bold">{p.asin}</span>
                   <span className="text-[9px] text-muted-foreground truncate w-full max-w-[80px]">
                     {index === 0 ? '人体工学椅' : index === 1 ? '微型投影仪' : '意式咖啡机'}
                   </span>
@@ -327,7 +350,9 @@ export const AIFunctions: React.FC = () => {
       <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-xs shrink-0">
         <div className="flex items-center space-x-1.5 pb-4 mb-4 border-b border-border">
           <Layers className="w-4 h-4 text-primary" />
-          <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">亚马逊 AI 流程自动化可视化工作台</h3>
+          <h3 className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+            亚马逊 AI 流程自动化可视化工作台
+          </h3>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-stretch relative">
@@ -398,7 +423,6 @@ export const AIFunctions: React.FC = () => {
 
       {/* 💻 Bottom Section: Dynamic Interactive Active Workspce */}
       <div className="flex-1 min-h-[460px] flex items-stretch">
-        
         {/* --- NODE 1 WORKSPACE: DATA INGESTION VIEW --- */}
         {selectedNode === 1 && (
           <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-6 flex flex-col justify-between gap-6 shadow-xs animate-fade-in">
@@ -406,7 +430,9 @@ export const AIFunctions: React.FC = () => {
               <div className="pb-4 border-b border-border flex items-center justify-between">
                 <div>
                   <h3 className="text-base font-extrabold text-foreground">已绑定母体商品细节</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">从本地 SQLite 数据表中已增量匹配提取的母体核心参数</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    从本地 SQLite 数据表中已增量匹配提取的母体核心参数
+                  </p>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-1 bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 font-bold border border-blue-200/50 dark:border-blue-800/30 rounded-full">
                   SQLite 双向数据绑定中
@@ -416,20 +442,27 @@ export const AIFunctions: React.FC = () => {
               {/* Product Info parameters cards grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-slate-50 dark:bg-zinc-900/30 border border-border rounded-lg space-y-1">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">母体标的 (ASIN)</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                    母体标的 (ASIN)
+                  </span>
                   <div className="text-sm font-extrabold text-foreground font-mono flex items-center gap-1.5">
                     <span>{currentProduct.asin}</span>
                     <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
                   </div>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-zinc-900/30 border border-border rounded-lg space-y-1">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">基准采集目录与平台</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                    基准采集目录与平台
+                  </span>
                   <div className="text-sm font-extrabold text-foreground truncate">
-                    {currentProduct.category.split(' > ').pop()} • 亚马逊 {currentProduct.marketplace.replace('站', '')}
+                    {currentProduct.category.split(' > ').pop()} • 亚马逊{' '}
+                    {currentProduct.marketplace.replace('站', '')}
                   </div>
                 </div>
                 <div className="p-4 bg-slate-50 dark:bg-zinc-900/30 border border-border rounded-lg space-y-1">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">参考零售价 & 销售指数</span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                    参考零售价 & 销售指数
+                  </span>
                   <div className="text-sm font-extrabold text-foreground font-mono">
                     {currentProduct.price} • {currentProduct.metrics.sales}
                   </div>
@@ -443,20 +476,46 @@ export const AIFunctions: React.FC = () => {
                   <span>SQLite 本地抓取数据流 (JSON/JSONB SQL Select Field View)</span>
                 </label>
                 <div className="bg-slate-950 dark:bg-black border border-border/80 rounded-lg p-4 font-mono text-[10.5px] text-slate-300 overflow-x-auto space-y-1.5">
-                  <div className="text-slate-500">// SELECT * FROM amz_crawler_products WHERE asin = '{currentProduct.asin}' LIMIT 1;</div>
-                  <div><span className="text-sky-400">"asin"</span>: <span className="text-amber-400">"{currentProduct.asin}"</span>,</div>
-                  <div><span className="text-sky-400">"marketplace"</span>: <span className="text-amber-400">"{currentProduct.marketplace}"</span>,</div>
-                  <div className="truncate"><span className="text-sky-400">"title"</span>: <span className="text-emerald-400">"{currentProduct.title}"</span>,</div>
-                  <div><span className="text-sky-400">"price"</span>: <span className="text-amber-400">"{currentProduct.price}"</span>,</div>
-                  <div className="truncate"><span className="text-sky-400">"category"</span>: <span className="text-amber-400">"{currentProduct.category}"</span>,</div>
-                  <div><span className="text-sky-400">"crawled_at"</span>: <span className="text-violet-400">"2026-05-31 10:15:32"</span>,</div>
-                  <div><span className="text-sky-400">"engine_version"</span>: <span className="text-amber-400">"DFS_Crawler_v1.2"</span></div>
+                  <div className="text-slate-500">
+                    // SELECT * FROM amz_crawler_products WHERE asin = '{currentProduct.asin}' LIMIT
+                    1;
+                  </div>
+                  <div>
+                    <span className="text-sky-400">"asin"</span>:{' '}
+                    <span className="text-amber-400">"{currentProduct.asin}"</span>,
+                  </div>
+                  <div>
+                    <span className="text-sky-400">"marketplace"</span>:{' '}
+                    <span className="text-amber-400">"{currentProduct.marketplace}"</span>,
+                  </div>
+                  <div className="truncate">
+                    <span className="text-sky-400">"title"</span>:{' '}
+                    <span className="text-emerald-400">"{currentProduct.title}"</span>,
+                  </div>
+                  <div>
+                    <span className="text-sky-400">"price"</span>:{' '}
+                    <span className="text-amber-400">"{currentProduct.price}"</span>,
+                  </div>
+                  <div className="truncate">
+                    <span className="text-sky-400">"category"</span>:{' '}
+                    <span className="text-amber-400">"{currentProduct.category}"</span>,
+                  </div>
+                  <div>
+                    <span className="text-sky-400">"crawled_at"</span>:{' '}
+                    <span className="text-violet-400">"2026-05-31 10:15:32"</span>,
+                  </div>
+                  <div>
+                    <span className="text-sky-400">"engine_version"</span>:{' '}
+                    <span className="text-amber-400">"DFS_Crawler_v1.2"</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-border">
-              <span className="text-[11px] text-muted-foreground">母体提取正常。所有关联大模型节点均同步响应。</span>
+              <span className="text-[11px] text-muted-foreground">
+                母体提取正常。所有关联大模型节点均同步响应。
+              </span>
               <button
                 onClick={() => setSelectedNode(2)}
                 className="inline-flex items-center justify-center space-x-1.5 bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-md hover:bg-primary/95 text-xs transition-all"
@@ -473,9 +532,12 @@ export const AIFunctions: React.FC = () => {
           <div className="w-full bg-card text-card-foreground border border-border rounded-xl p-6 flex flex-col justify-between gap-6 shadow-xs animate-fade-in">
             <div className="space-y-5 flex-1">
               <div className="pb-4 border-b border-border">
-                <h3 className="text-base font-extrabold text-foreground">AI 竞品核心痛点与卖点深度语义分析</h3>
+                <h3 className="text-base font-extrabold text-foreground">
+                  AI 竞品核心痛点与卖点深度语义分析
+                </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  基于大语言模型对该品类 1000+ 条真实买家 Review 文本的聚类挖掘，找出核心痛点进行精准降维打击
+                  基于大语言模型对该品类 1000+ 条真实买家 Review
+                  文本的聚类挖掘，找出核心痛点进行精准降维打击
                 </p>
               </div>
 
@@ -494,7 +556,10 @@ export const AIFunctions: React.FC = () => {
                           <span className="font-mono text-rose-500 font-bold">{c.weight}</span>
                         </div>
                         <div className="w-full bg-slate-200 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-rose-500 h-full rounded-full" style={{ width: c.weight }}></div>
+                          <div
+                            className="bg-rose-500 h-full rounded-full"
+                            style={{ width: c.weight }}
+                          ></div>
                         </div>
                       </div>
                     ))}
@@ -509,7 +574,10 @@ export const AIFunctions: React.FC = () => {
                   </h4>
                   <div className="space-y-3.5 bg-emerald-500/2 dark:bg-emerald-950/10 border border-emerald-500/10 rounded-xl p-4">
                     {currentProduct.strengths.map((s, i) => (
-                      <div key={i} className="flex items-start space-x-2 text-xs text-slate-700 dark:text-zinc-300 leading-normal">
+                      <div
+                        key={i}
+                        className="flex items-start space-x-2 text-xs text-slate-700 dark:text-zinc-300 leading-normal"
+                      >
                         <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                         <span>{s}</span>
                       </div>
@@ -520,8 +588,11 @@ export const AIFunctions: React.FC = () => {
 
               {/* Dynamic AI direction guidance */}
               <div className="space-y-1.5 bg-slate-50 dark:bg-zinc-900/30 border border-border p-3.5 rounded-lg text-xs leading-normal">
-                <span className="font-bold text-slate-700 dark:text-zinc-300 block mb-0.5">💡 AI 降维打击改写指导建议</span>
-                建议在下一步 Listing 生成中，针对竞品高发缺陷进行文案反向强力突出，例如突出我方的“阻燃静音安全”、“网布高耐久防塌陷”、“气动阀零故障后弯”等特性，一击即中！
+                <span className="font-bold text-slate-700 dark:text-zinc-300 block mb-0.5">
+                  💡 AI 降维打击改写指导建议
+                </span>
+                建议在下一步 Listing
+                生成中，针对竞品高发缺陷进行文案反向强力突出，例如突出我方的“阻燃静音安全”、“网布高耐久防塌陷”、“气动阀零故障后弯”等特性，一击即中！
               </div>
             </div>
 
@@ -544,7 +615,9 @@ export const AIFunctions: React.FC = () => {
             <div className="space-y-4 flex-1">
               <div className="pb-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-base font-extrabold text-foreground">AI 爆款 SEO Listing 智能撰写工坊</h3>
+                  <h3 className="text-base font-extrabold text-foreground">
+                    AI 爆款 SEO Listing 智能撰写工坊
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     根据痛点剖析结果自适应降维改写，全面植入核心高流量 Search Terms 搜索权重词
                   </p>
@@ -552,7 +625,9 @@ export const AIFunctions: React.FC = () => {
 
                 {/* Tone settings */}
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-semibold shrink-0">改写文风语气:</span>
+                  <span className="text-xs text-slate-500 font-semibold shrink-0">
+                    改写文风语气:
+                  </span>
                   <select
                     value={selectedTone}
                     onChange={(e) => setSelectedTone(e.target.value as any)}
@@ -604,7 +679,9 @@ export const AIFunctions: React.FC = () => {
                 {isGenerating ? (
                   <div className="h-full flex flex-col items-center justify-center text-center space-y-2.5">
                     <RefreshCw className="w-6 h-6 text-primary animate-spin" />
-                    <p className="text-[11px] text-muted-foreground">正在基于本品特性与竞品缺陷分析，精细化重构爆款文案中...</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      正在基于本品特性与竞品缺陷分析，精细化重构爆款文案中...
+                    </p>
                   </div>
                 ) : listingTab === 'title' ? (
                   <div>{listingTitle}</div>
@@ -667,7 +744,9 @@ export const AIFunctions: React.FC = () => {
             <div className="space-y-4 flex-1">
               <div className="pb-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-base font-extrabold text-foreground">AI 高清高转化营销配图渲染舱</h3>
+                  <h3 className="text-base font-extrabold text-foreground">
+                    AI 高清高转化营销配图渲染舱
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     调用 Diffusion 大模型，一键为商品重绘摄影棚白底主图、高端户外或家居生活场景图
                   </p>
@@ -748,7 +827,9 @@ export const AIFunctions: React.FC = () => {
                   {isGeneratingImage ? (
                     <div className="border border-border/80 rounded-xl h-[170px] bg-slate-950/20 dark:bg-black/40 flex flex-col items-center justify-center space-y-2">
                       <RefreshCw className="w-6 h-6 text-primary animate-spin" />
-                      <span className="text-[11px] text-muted-foreground font-mono">DALL-E-3 / Stable Diffusion 引擎正在极速出图...</span>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        DALL-E-3 / Stable Diffusion 引擎正在极速出图...
+                      </span>
                     </div>
                   ) : (
                     <div className="grid grid-cols-3 gap-3">
@@ -772,7 +853,12 @@ export const AIFunctions: React.FC = () => {
 
                           {/* Card bottom text */}
                           <div className="text-[9px] text-white/50 truncate text-center font-mono">
-                            {aspectRatio} • {idx === 0 ? '摄影棚白底图' : idx === 1 ? '家居品质生活' : '多色户外场景'}
+                            {aspectRatio} •{' '}
+                            {idx === 0
+                              ? '摄影棚白底图'
+                              : idx === 1
+                                ? '家居品质生活'
+                                : '多色户外场景'}
                           </div>
                         </div>
                       ))}
@@ -788,7 +874,9 @@ export const AIFunctions: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-border">
-              <span className="text-[11px] text-muted-foreground">Diffusion 生图渲染正常。我方上架图层资源就绪。</span>
+              <span className="text-[11px] text-muted-foreground">
+                Diffusion 生图渲染正常。我方上架图层资源就绪。
+              </span>
               <button
                 onClick={() => setSelectedNode(5)}
                 className="inline-flex items-center justify-center space-x-1.5 bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-md hover:bg-primary/95 text-xs transition-all"
@@ -806,15 +894,20 @@ export const AIFunctions: React.FC = () => {
             <div className="space-y-4 flex-1">
               <div className="pb-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-base font-extrabold text-foreground">一键跨境 ERP 接口与亚马逊 SP-API 发布部署中心</h3>
+                  <h3 className="text-base font-extrabold text-foreground">
+                    一键跨境 ERP 接口与亚马逊 SP-API 发布部署中心
+                  </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    将智能重构的 Listing 文案资产及 AI 营销配图一键直接同步封装，推送至第三方 ERP 待上架队列
+                    将智能重构的 Listing 文案资产及 AI 营销配图一键直接同步封装，推送至第三方 ERP
+                    待上架队列
                   </p>
                 </div>
 
                 {/* Target channels options */}
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 font-semibold shrink-0">选择上架目标通道:</span>
+                  <span className="text-xs text-slate-500 font-semibold shrink-0">
+                    选择上架目标通道:
+                  </span>
                   <select
                     value={targetChannel}
                     onChange={(e) => setTargetChannel(e.target.value)}
@@ -837,13 +930,37 @@ export const AIFunctions: React.FC = () => {
                   </label>
                   <div className="bg-slate-950 dark:bg-black border border-border/80 rounded-lg p-4 font-mono text-[9.5px] text-slate-300 overflow-y-auto h-[170px] space-y-1">
                     <div>{`{`}</div>
-                    <div>  <span className="text-sky-400">"asin_seed"</span>: <span className="text-amber-400">"{currentProduct.asin}"</span>,</div>
-                    <div>  <span className="text-sky-400">"target_channel"</span>: <span className="text-amber-400">"{targetChannel}"</span>,</div>
-                    <div>  <span className="text-sky-400">"payload_data"</span>: {`{`}</div>
-                    <div className="truncate">    <span className="text-sky-400">"title"</span>: <span className="text-emerald-400">"{listingTitle.replace(/\n/g, ' ')}"</span>,</div>
-                    <div>    <span className="text-sky-400">"bullets_count"</span>: <span className="text-amber-400">5</span>,</div>
-                    <div>    <span className="text-sky-400">"image_assets_uploaded"</span>: <span className="text-amber-400">{imageCount}</span></div>
-                    <div>  {`}`}</div>
+                    <div>
+                      {' '}
+                      <span className="text-sky-400">"asin_seed"</span>:{' '}
+                      <span className="text-amber-400">"{currentProduct.asin}"</span>,
+                    </div>
+                    <div>
+                      {' '}
+                      <span className="text-sky-400">"target_channel"</span>:{' '}
+                      <span className="text-amber-400">"{targetChannel}"</span>,
+                    </div>
+                    <div>
+                      {' '}
+                      <span className="text-sky-400">"payload_data"</span>: {`{`}
+                    </div>
+                    <div className="truncate">
+                      {' '}
+                      <span className="text-sky-400">"title"</span>:{' '}
+                      <span className="text-emerald-400">"{listingTitle.replace(/\n/g, ' ')}"</span>
+                      ,
+                    </div>
+                    <div>
+                      {' '}
+                      <span className="text-sky-400">"bullets_count"</span>:{' '}
+                      <span className="text-amber-400">5</span>,
+                    </div>
+                    <div>
+                      {' '}
+                      <span className="text-sky-400">"image_assets_uploaded"</span>:{' '}
+                      <span className="text-amber-400">{imageCount}</span>
+                    </div>
+                    <div> {`}`}</div>
                     <div>{`}`}</div>
                   </div>
                 </div>
@@ -857,8 +974,10 @@ export const AIFunctions: React.FC = () => {
                     <div className="flex-1 bg-slate-950 dark:bg-black border border-border/80 rounded-lg p-4 font-mono text-[10px] text-slate-300 overflow-y-auto space-y-1 h-[140px] max-h-[140px]">
                       {publisherLog.map((log, idx) => {
                         let color = 'text-slate-400'
-                        if (log.startsWith('[成功]') || log.startsWith('[上架成功]')) color = 'text-emerald-400 font-semibold'
-                        if (log.startsWith('[开始]') || log.startsWith('[参数]')) color = 'text-sky-400'
+                        if (log.startsWith('[成功]') || log.startsWith('[上架成功]'))
+                          color = 'text-emerald-400 font-semibold'
+                        if (log.startsWith('[开始]') || log.startsWith('[参数]'))
+                          color = 'text-sky-400'
                         if (log.startsWith('[验证]')) color = 'text-amber-400'
                         if (log.startsWith('[推送]')) color = 'text-indigo-400'
                         return (
@@ -895,7 +1014,6 @@ export const AIFunctions: React.FC = () => {
             </div>
           </div>
         )}
-
       </div>
     </div>
   )

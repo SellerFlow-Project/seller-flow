@@ -257,7 +257,11 @@ class DatabaseService {
    * 新建一个采集任务日志
    * @returns 自动插入的自增 ID (作为主键)
    */
-  public createTask(taskName: string, taskType: CrawlTaskType | string, marketplace: string): number {
+  public createTask(
+    taskName: string,
+    taskType: CrawlTaskType | string,
+    marketplace: string
+  ): number {
     const db = this.assertDb()
     const stmt = db.prepare(`
       INSERT INTO crawl_tasks (task_name, task_type, marketplace, status)
@@ -758,9 +762,10 @@ class DatabaseService {
     return { total, list }
   }
 
-  public queryAmazonSearchKeywords(
-    filter?: SearchKeywordQueryFilter
-  ): { total: number; list: AmazonSearchKeywordRow[] } {
+  public queryAmazonSearchKeywords(filter?: SearchKeywordQueryFilter): {
+    total: number
+    list: AmazonSearchKeywordRow[]
+  } {
     const db = this.assertDb()
     const params: Array<string | number> = []
     const whereClauses: string[] = []

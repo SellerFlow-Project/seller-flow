@@ -22,14 +22,15 @@ function getScopeLabel(scope: 'category' | 'detail'): string {
   return scope === 'category' ? '分类/翻页' : '商品详情'
 }
 
-function getNodeScopeCooldown(node: MihomoProxyNode, scope: 'category' | 'detail'): string | null | undefined {
+function getNodeScopeCooldown(
+  node: MihomoProxyNode,
+  scope: 'category' | 'detail'
+): string | null | undefined {
   return scope === 'category' ? node.categoryCooldownUntil : node.detailCooldownUntil
 }
 
 function getNodeScopeReason(node: MihomoProxyNode, scope: 'category' | 'detail'): string {
-  return scope === 'category'
-    ? node.categoryCooldownReason || ''
-    : node.detailCooldownReason || ''
+  return scope === 'category' ? node.categoryCooldownReason || '' : node.detailCooldownReason || ''
 }
 
 function getNodeScopeFailureCount(node: MihomoProxyNode, scope: 'category' | 'detail'): number {

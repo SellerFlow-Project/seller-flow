@@ -395,11 +395,17 @@ export const AmazonSearch: React.FC = () => {
                   : 'bg-slate-500/10 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 border-slate-500/10 dark:border-zinc-700'
               }`}
             >
-              {isCrawling && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />}
+              {isCrawling && (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
+              )}
               <span>{isCrawling ? '任务执行中' : '就绪 (READY)'}</span>
             </div>
             <button className="p-1 hover:bg-slate-200 dark:hover:bg-zinc-800 rounded transition-colors text-muted-foreground hover:text-foreground">
-              {isConfigExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {isConfigExpanded ? (
+                <ChevronUp className="w-4 h-4" />
+              ) : (
+                <ChevronDown className="w-4 h-4" />
+              )}
             </button>
           </div>
         </div>
@@ -446,7 +452,10 @@ export const AmazonSearch: React.FC = () => {
                         {username}
                       </span>
                     </div>
-                    <div className="flex items-center space-x-2 font-mono text-muted-foreground text-[10px] shrink-0" title={`Token过期时间: ${tokenExpiry}`}>
+                    <div
+                      className="flex items-center space-x-2 font-mono text-muted-foreground text-[10px] shrink-0"
+                      title={`Token过期时间: ${tokenExpiry}`}
+                    >
                       <Clock className="w-3 h-3 text-slate-400" />
                       <span>{tokenExpiry.split(' ')[0]}</span>
                       <button
@@ -466,13 +475,17 @@ export const AmazonSearch: React.FC = () => {
             <div className="space-y-4 pt-1">
               <FilterGroup title="AMZ123 本周排名">
                 {RANK_OPTIONS.map((option) =>
-                  renderOptionPill(option, selectedRanks.includes(option), () => handleRankToggle(option))
+                  renderOptionPill(option, selectedRanks.includes(option), () =>
+                    handleRankToggle(option)
+                  )
                 )}
               </FilterGroup>
 
               <FilterGroup title="AMZ123 涨跌幅度">
                 {CHANGE_OPTIONS.map((option) =>
-                  renderOptionPill(option, selectedChanges.includes(option), () => handleChangeToggle(option))
+                  renderOptionPill(option, selectedChanges.includes(option), () =>
+                    handleChangeToggle(option)
+                  )
                 )}
               </FilterGroup>
 
@@ -551,7 +564,8 @@ export const AmazonSearch: React.FC = () => {
               </h4>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
                 系统会先调用 AMZ123 获取搜索词，再按商品详情节点策略访问 Amazon
-                搜索结果页，根据配送天数和匹配商品数量筛选，符合条件的搜索词与商品会写入本地 SQLite。
+                搜索结果页，根据配送天数和匹配商品数量筛选，符合条件的搜索词与商品会写入本地
+                SQLite。
               </p>
             </div>
           </div>
@@ -568,8 +582,8 @@ export const AmazonSearch: React.FC = () => {
               <h2 className="font-semibold text-sm">搜索词采集进度</h2>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">
-              当前已处理 {status.metrics.processedKeywords} / {status.metrics.totalKeywords} 个搜索词，
-              已保存符合条件搜索词 {status.metrics.savedKeywords} 个
+              当前已处理 {status.metrics.processedKeywords} / {status.metrics.totalKeywords}{' '}
+              个搜索词， 已保存符合条件搜索词 {status.metrics.savedKeywords} 个
             </p>
           </div>
           <div className="text-right">
@@ -606,7 +620,10 @@ export const AmazonSearch: React.FC = () => {
           className="flex-1 bg-slate-950 dark:bg-black border border-border/80 rounded-md p-4 font-mono text-[11px] text-slate-300 overflow-y-auto flex flex-col space-y-1.5 min-h-[220px]"
         >
           {logs.map((log, index) => (
-            <div key={`${index}-${log}`} className={`whitespace-pre-wrap leading-relaxed ${getLogColor(log)}`}>
+            <div
+              key={`${index}-${log}`}
+              className={`whitespace-pre-wrap leading-relaxed ${getLogColor(log)}`}
+            >
               {log}
             </div>
           ))}
@@ -715,9 +732,12 @@ function MetricCard({
   return (
     <div className="bg-card text-card-foreground border border-border rounded-lg p-5 flex items-center justify-between transition-all duration-200 hover:border-primary/50 hover:shadow-sm">
       <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {label}
+        </p>
         <h3 className={`text-2xl font-bold mt-1 ${colorClass}`}>
-          {value} {suffix && <span className="text-xs font-normal text-muted-foreground">{suffix}</span>}
+          {value}{' '}
+          {suffix && <span className="text-xs font-normal text-muted-foreground">{suffix}</span>}
         </h3>
       </div>
       <div className={`p-3 rounded-lg bg-primary/10 ${colorClass}`}>{icon}</div>
@@ -762,7 +782,9 @@ function NumberInput({
     <div className="space-y-1.5">
       <label className="text-xs font-semibold text-muted-foreground uppercase flex items-center justify-between">
         <span>{label}</span>
-        <span className="text-[10px] text-muted-foreground lowercase normal-case">单位：{unit}</span>
+        <span className="text-[10px] text-muted-foreground lowercase normal-case">
+          单位：{unit}
+        </span>
       </label>
       <div className="relative">
         <input

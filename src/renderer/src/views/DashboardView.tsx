@@ -1,5 +1,14 @@
 import React from 'react'
-import { Cpu, FileSpreadsheet, Bot, ArrowRight, Network, Sparkles, ChevronRight, Activity } from 'lucide-react'
+import {
+  Cpu,
+  FileSpreadsheet,
+  Bot,
+  ArrowRight,
+  Network,
+  Sparkles,
+  ChevronRight,
+  Activity
+} from 'lucide-react'
 import { useAppStore } from '../store/appStore'
 
 export const DashboardView: React.FC = () => {
@@ -28,20 +37,19 @@ export const DashboardView: React.FC = () => {
             <span>智能跨境电商工作流看板</span>
           </h2>
           <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-2xl">
-            欢迎使用 SellerFlow！以下是为您定制的自动化商品流闭环。点击下方流程图中的各个核心处理节点，即可快速跳转到对应的业务界面展开工作。
+            欢迎使用
+            SellerFlow！以下是为您定制的自动化商品流闭环。点击下方流程图中的各个核心处理节点，即可快速跳转到对应的业务界面展开工作。
           </p>
         </div>
       </div>
 
       {/* Main Flowchart Card */}
       <div className="bg-card text-card-foreground border border-border rounded-lg p-10 flex-1 flex flex-col items-center justify-center transition-all-200 hover:border-primary/20 min-h-[450px] relative overflow-hidden">
-
         {/* Decorative Grid Background */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(128,128,128,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(128,128,128,0.03)_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
         {/* Outer Layout container */}
         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-11 gap-4 items-center relative z-10">
-
           {/* Node 1: Left Node - Data Collection (数据采集) */}
           <div className="md:col-span-4 flex justify-center">
             <button
@@ -53,7 +61,9 @@ export const DashboardView: React.FC = () => {
                   <Cpu className="w-6 h-6" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider">数据入口 (Source)</span>
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-wider">
+                    数据入口 (Source)
+                  </span>
                   <h3 className="font-bold text-sm text-foreground">数据采集</h3>
                 </div>
               </div>
@@ -70,7 +80,11 @@ export const DashboardView: React.FC = () => {
           {/* Connectors: Middle Connectors (SVG Flowchart arrows) */}
           <div className="md:col-span-3 h-48 md:h-full flex items-center justify-center relative">
             {/* Desktop SVG Connector Paths */}
-            <svg className="hidden md:block w-full h-48 overflow-visible absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <svg
+              className="hidden md:block w-full h-48 overflow-visible absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+            >
               {/* Path 1: Left center to upper-right */}
               <path
                 d="M 5,50 C 35,50 35,20 95,20"
@@ -116,7 +130,6 @@ export const DashboardView: React.FC = () => {
 
           {/* Right Nodes: Vertical Stack of Targets */}
           <div className="md:col-span-4 flex flex-col space-y-6 justify-center">
-
             {/* Node 2: Top Right - Data Management (数据管理) */}
             <button
               onClick={() => setTab('data-browsing')}
@@ -127,7 +140,9 @@ export const DashboardView: React.FC = () => {
                   <FileSpreadsheet className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">本地存储 (Storage)</span>
+                  <span className="text-[10px] font-bold text-blue-500 uppercase tracking-wider">
+                    本地存储 (Storage)
+                  </span>
                   <h3 className="font-bold text-sm text-foreground">数据管理</h3>
                 </div>
               </div>
@@ -150,21 +165,22 @@ export const DashboardView: React.FC = () => {
                   <Bot className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">智能重塑 (Intelligence)</span>
+                  <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider">
+                    智能重塑 (Intelligence)
+                  </span>
                   <h3 className="font-bold text-sm text-foreground">AI 处理</h3>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground leading-normal mb-4">
-                连接大语言模型，将采集出的商品参数与卖点智能改写为高转化率的亚马逊 Listing 标题与五点描述。
+                连接大语言模型，将采集出的商品参数与卖点智能改写为高转化率的亚马逊 Listing
+                标题与五点描述。
               </p>
               <div className="flex items-center justify-between pt-3 border-t border-border text-[11px] font-bold text-indigo-500">
                 <span>进入AI功能</span>
                 <ChevronRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
-
           </div>
-
         </div>
 
         {/* Footer Hint */}

@@ -444,7 +444,9 @@ export const AmazonCollection: React.FC = () => {
     setShowAdjustModal(false)
     setIsCrawling(true)
     setIsStopping(false)
-    setLogs([`[系统] 正在向主进程引擎发起${CrawlTaskTypeNames[preparedTaskType]}深度 DFS 采集指令...`])
+    setLogs([
+      `[系统] 正在向主进程引擎发起${CrawlTaskTypeNames[preparedTaskType]}深度 DFS 采集指令...`
+    ])
 
     // 重置实时拓扑状态
     setFirstLevelCats([])
@@ -591,13 +593,13 @@ export const AmazonCollection: React.FC = () => {
         ? `等待满批 (${deliveryDetail.waitingProductCount}/${deliveryDetail.batchSize})`
         : deliveryDetail.phase === 'risk_control_cooldown'
           ? '请求异常/风控，冷却 10 分钟后自动重试'
-        : deliveryDetail.phase === 'stopping'
-          ? '正在停止'
-          : deliveryDetail.phase === 'failed'
-            ? `详情采集失败: ${deliveryDetail.lastError || '未知异常'}`
-            : deliveryDetail.phase === 'completed'
-              ? '完整批次已处理完毕'
-              : '等待任务启动'
+          : deliveryDetail.phase === 'stopping'
+            ? '正在停止'
+            : deliveryDetail.phase === 'failed'
+              ? `详情采集失败: ${deliveryDetail.lastError || '未知异常'}`
+              : deliveryDetail.phase === 'completed'
+                ? '完整批次已处理完毕'
+                : '等待任务启动'
 
   return (
     <div className="p-6 space-y-6 flex flex-col h-full overflow-y-auto bg-slate-50 dark:bg-black">

@@ -158,7 +158,8 @@ export const SellerSprite: React.FC = () => {
       setConfirmModal({
         show: true,
         title: '一键删除所有账号确认',
-        message: '🚨 警告：您确定要一键清空本地所有卖家精灵的账号数据吗？该操作属于高危动作，确认后数据将永久丢失。',
+        message:
+          '🚨 警告：您确定要一键清空本地所有卖家精灵的账号数据吗？该操作属于高危动作，确认后数据将永久丢失。',
         actionType
       })
     }
@@ -223,7 +224,9 @@ export const SellerSprite: React.FC = () => {
             <span className="p-1.5 bg-purple-500/10 text-purple-500 rounded">
               <Bot className="w-5 h-5" />
             </span>
-            <h2 className="text-xl font-bold text-foreground">卖家精灵账号管理 (SellerSprite Accounts)</h2>
+            <h2 className="text-xl font-bold text-foreground">
+              卖家精灵账号管理 (SellerSprite Accounts)
+            </h2>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
             配置与维护卖家精灵账号，用于抓取或进行关键词分析
@@ -259,7 +262,10 @@ export const SellerSprite: React.FC = () => {
         <div className="bg-card text-card-foreground border border-border rounded-lg p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:border-purple-500/20">
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase">总配置账号数</p>
-            <h3 className="text-2xl font-black mt-1 text-purple-600 dark:text-purple-400">{statistics.total} <span className="text-xs font-normal text-muted-foreground">组</span></h3>
+            <h3 className="text-2xl font-black mt-1 text-purple-600 dark:text-purple-400">
+              {statistics.total}{' '}
+              <span className="text-xs font-normal text-muted-foreground">组</span>
+            </h3>
           </div>
           <div className="p-3 rounded-lg bg-purple-600/10 text-purple-600">
             <User className="w-5.5 h-5.5" />
@@ -269,7 +275,10 @@ export const SellerSprite: React.FC = () => {
         <div className="bg-card text-card-foreground border border-border rounded-lg p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:border-emerald-500/20">
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase">正常账号数量</p>
-            <h3 className="text-2xl font-black mt-1 text-emerald-500 dark:text-emerald-400">{statistics.normal} <span className="text-xs font-normal text-muted-foreground">正常可用</span></h3>
+            <h3 className="text-2xl font-black mt-1 text-emerald-500 dark:text-emerald-400">
+              {statistics.normal}{' '}
+              <span className="text-xs font-normal text-muted-foreground">正常可用</span>
+            </h3>
           </div>
           <div className="p-3 rounded-lg bg-emerald-500/10 text-emerald-500">
             <Check className="w-5.5 h-5.5" />
@@ -279,7 +288,10 @@ export const SellerSprite: React.FC = () => {
         <div className="bg-card text-card-foreground border border-border rounded-lg p-5 flex items-center justify-between shadow-sm transition-all duration-200 hover:border-rose-500/20">
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase">失效账号数量</p>
-            <h3 className="text-2xl font-black mt-1 text-rose-500">{statistics.invalid} <span className="text-xs font-normal text-muted-foreground">待维护</span></h3>
+            <h3 className="text-2xl font-black mt-1 text-rose-500">
+              {statistics.invalid}{' '}
+              <span className="text-xs font-normal text-muted-foreground">待维护</span>
+            </h3>
           </div>
           <div className="p-3 rounded-lg bg-rose-500/10 text-rose-500">
             <AlertCircle className="w-5.5 h-5.5" />
@@ -338,9 +350,14 @@ export const SellerSprite: React.FC = () => {
                   accounts.map((acc, index) => {
                     const isPassVisible = !!visiblePasswords[acc.id]
                     return (
-                      <tr key={acc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors duration-150">
+                      <tr
+                        key={acc.id}
+                        className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition-colors duration-150"
+                      >
                         {/* ID */}
-                        <td className="py-3.5 px-4 text-center text-muted-foreground font-semibold">{index + 1}</td>
+                        <td className="py-3.5 px-4 text-center text-muted-foreground font-semibold">
+                          {index + 1}
+                        </td>
 
                         {/* 账号 */}
                         <td className="py-3.5 px-4 font-bold text-foreground flex items-center space-x-2">
@@ -360,7 +377,11 @@ export const SellerSprite: React.FC = () => {
                               className="text-muted-foreground hover:text-purple-500 p-0.5 rounded shrink-0 transition-colors"
                               title={isPassVisible ? '隐藏密码' : '明文显示密码'}
                             >
-                              {isPassVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              {isPassVisible ? (
+                                <EyeOff className="w-3.5 h-3.5" />
+                              ) : (
+                                <Eye className="w-3.5 h-3.5" />
+                              )}
                             </button>
                           </div>
                         </td>

@@ -1,8 +1,5 @@
 import Store from 'electron-store'
-import type {
-  AmazonSearchConfig,
-  Amz123Session
-} from '../../shared/amazon-search'
+import type { AmazonSearchConfig, Amz123Session } from '../../shared/amazon-search'
 
 interface AmazonSearchStore {
   session: Amz123Session | null
@@ -66,7 +63,8 @@ function normalizeSession(value: unknown): Amz123Session | null {
 }
 
 function normalizeConfig(value: unknown): AmazonSearchConfig {
-  const raw = typeof value === 'object' && value !== null ? (value as Partial<AmazonSearchConfig>) : {}
+  const raw =
+    typeof value === 'object' && value !== null ? (value as Partial<AmazonSearchConfig>) : {}
   const minDeliveryInterval = normalizeNumber(
     raw.minDeliveryInterval,
     DEFAULT_CONFIG.minDeliveryInterval
@@ -78,7 +76,10 @@ function normalizeConfig(value: unknown): AmazonSearchConfig {
 
   return {
     marketplace:
-      raw.marketplace === 'JP' || raw.marketplace === 'US' || raw.marketplace === 'UK' || raw.marketplace === 'DE'
+      raw.marketplace === 'JP' ||
+      raw.marketplace === 'US' ||
+      raw.marketplace === 'UK' ||
+      raw.marketplace === 'DE'
         ? raw.marketplace
         : DEFAULT_CONFIG.marketplace,
     selectedRanks: normalizeStringArray(raw.selectedRanks, DEFAULT_CONFIG.selectedRanks),
@@ -90,11 +91,7 @@ function normalizeConfig(value: unknown): AmazonSearchConfig {
       DEFAULT_CONFIG.matchingProductCount,
       1
     ),
-    concurrency: normalizeNumber(
-      raw.concurrency,
-      DEFAULT_CONFIG.concurrency,
-      1
-    )
+    concurrency: normalizeNumber(raw.concurrency, DEFAULT_CONFIG.concurrency, 1)
   }
 }
 

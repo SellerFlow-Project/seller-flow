@@ -25,10 +25,7 @@ export const MIHOMO_CORE_RELEASE_ASSETS = {
 
 export type MihomoSupportedPlatformArch = keyof typeof MIHOMO_CORE_RELEASE_ASSETS
 
-export function getMihomoPlatformArch(
-  platform = process.platform,
-  arch = process.arch
-): string {
+export function getMihomoPlatformArch(platform = process.platform, arch = process.arch): string {
   return `${platform}-${arch}`
 }
 

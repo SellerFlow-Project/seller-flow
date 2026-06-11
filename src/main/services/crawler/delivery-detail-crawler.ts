@@ -151,9 +151,7 @@ export class AmazonDeliveryDetailCrawler {
       }
 
       if (batch.length < DELIVERY_DETAIL_BATCH_SIZE && sourceComplete) {
-        onProgress(
-          `[详情] 源采集已完成，开始处理剩余 ${batch.length} 个不足整批的商品详情。`
-        )
+        onProgress(`[详情] 源采集已完成，开始处理剩余 ${batch.length} 个不足整批的商品详情。`)
       }
 
       try {

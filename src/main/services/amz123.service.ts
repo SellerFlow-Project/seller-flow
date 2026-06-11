@@ -250,9 +250,7 @@ class Amz123Service {
     }
 
     const rows = Array.isArray(data.rows)
-      ? data.rows
-          .map(normalizeHotwordRow)
-          .filter((item): item is Amz123HotwordRow => Boolean(item))
+      ? data.rows.map(normalizeHotwordRow).filter((item): item is Amz123HotwordRow => Boolean(item))
       : []
     const total = getNumber(data.total) ?? rows.length
 

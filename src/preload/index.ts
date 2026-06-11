@@ -162,6 +162,8 @@ const dataSharing: DataSharingApi = {
       (value): value is Awaited<ReturnType<DataSharingApi['discoverSources']>> =>
         Array.isArray(value) && value.every(isSharedDataSource)
     ),
+  connectManualSource: (host, port) =>
+    invokeAccount('data-sharing:connect-manual-source', [host, port], isSharedDataSource),
   getRemoteTasks: (source) => invokeAccount('data-sharing:get-remote-tasks', [source]),
   getRemoteCategories: (source, taskId) =>
     invokeAccount('data-sharing:get-remote-categories', [source, taskId]),
@@ -198,12 +200,10 @@ const mihomo: MihomoApi = {
 }
 
 const amazonSearch: AmazonSearchApi = {
-  getLocalState: () =>
-    invokeAccount('amazon-search:get-local-state', [], isAmazonSearchLocalState),
+  getLocalState: () => invokeAccount('amazon-search:get-local-state', [], isAmazonSearchLocalState),
   saveConfig: (config) =>
     invokeAccount('amazon-search:save-config', [config], isAmazonSearchConfig),
-  requestLoginCode: () =>
-    invokeAccount('amazon-search:request-login-code', [], isAmz123LoginCode),
+  requestLoginCode: () => invokeAccount('amazon-search:request-login-code', [], isAmz123LoginCode),
   pollLoginStatus: (ticket) =>
     invokeAccount('amazon-search:poll-login-status', [ticket], isAmz123LoginStatus),
   logout: () => invokeAccount('amazon-search:logout', []),
@@ -219,10 +219,7 @@ const amazonSearch: AmazonSearchApi = {
     return () => ipcRenderer.removeListener('amazon-search:log-progress', listener)
   },
   onStateChange: (callback) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      state: AmazonSearchStatus
-    ): void => {
+    const listener = (_event: Electron.IpcRendererEvent, state: AmazonSearchStatus): void => {
       callback(state)
     }
 

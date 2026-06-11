@@ -1062,12 +1062,24 @@ export const AccountAdminView: React.FC = () => {
                         <th className="py-2.5 px-4 font-bold uppercase tracking-wider w-20 bg-slate-100 dark:bg-zinc-900">
                           事件 ID
                         </th>
-                        <th className="py-2.5 px-4 font-bold bg-slate-100 dark:bg-zinc-900">操作名称</th>
-                        <th className="py-2.5 px-4 font-bold bg-slate-100 dark:bg-zinc-900">目标对象类型</th>
-                        <th className="py-2.5 px-4 font-bold bg-slate-100 dark:bg-zinc-900">关联目标 ID</th>
-                        <th className="py-2.5 px-4 font-bold text-center bg-slate-100 dark:bg-zinc-900">操作人 ID</th>
-                        <th className="py-2.5 px-4 font-bold text-center bg-slate-100 dark:bg-zinc-900">发生时间</th>
-                        <th className="py-2.5 px-4 font-bold text-center w-16 bg-slate-100 dark:bg-zinc-900">详情</th>
+                        <th className="py-2.5 px-4 font-bold bg-slate-100 dark:bg-zinc-900">
+                          操作名称
+                        </th>
+                        <th className="py-2.5 px-4 font-bold bg-slate-100 dark:bg-zinc-900">
+                          目标对象类型
+                        </th>
+                        <th className="py-2.5 px-4 font-bold bg-slate-100 dark:bg-zinc-900">
+                          关联目标 ID
+                        </th>
+                        <th className="py-2.5 px-4 font-bold text-center bg-slate-100 dark:bg-zinc-900">
+                          操作人 ID
+                        </th>
+                        <th className="py-2.5 px-4 font-bold text-center bg-slate-100 dark:bg-zinc-900">
+                          发生时间
+                        </th>
+                        <th className="py-2.5 px-4 font-bold text-center w-16 bg-slate-100 dark:bg-zinc-900">
+                          详情
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">

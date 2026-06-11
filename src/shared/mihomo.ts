@@ -1,9 +1,5 @@
 export type MihomoProxyMode = 'disabled' | 'node-pool'
-export type MihomoNodeStrategy =
-  | 'sticky-10-minutes'
-  | 'round-robin'
-  | 'random'
-  | 'lowest-latency'
+export type MihomoNodeStrategy = 'sticky-10-minutes' | 'round-robin' | 'random' | 'lowest-latency'
 
 export interface MihomoProxyNode {
   id: string

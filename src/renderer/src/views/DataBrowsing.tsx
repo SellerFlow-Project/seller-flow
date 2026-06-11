@@ -73,6 +73,8 @@ export const DataBrowsing: React.FC = () => {
   const [selectedDataSource, setSelectedDataSource] = useState(LOCAL_DATA_SOURCE_ID)
   const [remoteDataSources, setRemoteDataSources] = useState<SharedDataSource[]>([])
   const [isSourceRefreshing, setIsSourceRefreshing] = useState(false)
+  const [isManualSourceConnecting, setIsManualSourceConnecting] = useState(false)
+  const [manualSourceAddress, setManualSourceAddress] = useState('')
   const [dataSourceError, setDataSourceError] = useState('')
 
   const selectedRemoteDataSource = useMemo(
@@ -98,6 +100,31 @@ export const DataBrowsing: React.FC = () => {
       setDataSourceError(error instanceof Error ? error.message : '扫描局域网数据源失败。')
     } finally {
       setIsSourceRefreshing(false)
+    }
+  }
+
+  const handleConnectManualSource = async (): Promise<void> => {
+    const [host, portText] = manualSourceAddress.trim().split(':')
+    const port = Number(portText || '48991')
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+      setDataSourceError('请输入正确的数据源地址，例如 192.168.1.23:48991。')
+      return
+    }
+
+    setIsManualSourceConnecting(true)
+    setDataSourceError('')
+
+    try {
+      const source = await window.api.dataSharing.connectManualSource(host, port)
+      setRemoteDataSources((currentSources) => [
+        source,
+        ...currentSources.filter((currentSource) => currentSource.id !== source.id)
+      ])
+      setSelectedDataSource(source.id)
+    } catch (error) {
+      setDataSourceError(error instanceof Error ? error.message : '连接数据源失败。')
+    } finally {
+      setIsManualSourceConnecting(false)
     }
   }
 
@@ -577,89 +604,141 @@ export const DataBrowsing: React.FC = () => {
       </div>
 
       {/* 2. 任务全局边界选择器 Card */}
-      <div className="bg-card text-card-foreground border border-border rounded-lg p-5 shadow-sm transition-all duration-200 hover:border-primary/20">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex flex-1 flex-col md:flex-row md:items-center gap-4">
-            {/* 数据源选择 */}
-            <div className="flex items-center space-x-2 shrink-0">
-              <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
-                数据源
+      <div className="bg-card text-card-foreground border border-border rounded-xl p-5 shadow-sm transition-all duration-200 hover:border-primary/20">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          {/* Left Column: Data Source Config */}
+          <div className="lg:col-span-7 flex flex-col space-y-4">
+            <div className="flex items-center space-x-2 pb-2 border-b border-border/60">
+              <Database className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                数据源配置
               </span>
             </div>
 
-            <div className="flex items-center gap-2 max-w-[200px] w-full shrink-0">
-              <select
-                value={selectedDataSource}
-                onChange={(e) => setSelectedDataSource(e.target.value)}
-                className="w-full bg-background border border-border rounded-md px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-semibold"
-              >
-                <option value="local">本地数据</option>
-                {remoteDataSources.map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.name} ({source.host}:{source.port})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleRefreshSource}
-                disabled={isSourceRefreshing}
-                className="p-2 border border-border rounded-md bg-card hover:bg-slate-100 dark:hover:bg-zinc-900 text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-50"
-                title="刷新数据源"
-              >
-                <RefreshCw
-                  className={`w-3.5 h-3.5 ${isSourceRefreshing ? 'animate-spin text-primary' : ''}`}
-                />
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 选择数据源 */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  选择数据源
+                </label>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedDataSource}
+                    onChange={(e) => setSelectedDataSource(e.target.value)}
+                    className="flex-1 bg-background border border-border rounded-md px-3.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-semibold"
+                  >
+                    <option value="local">本地数据</option>
+                    {remoteDataSources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.name} ({source.host}:{source.port})
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleRefreshSource}
+                    disabled={isSourceRefreshing}
+                    className="p-2 border border-border rounded-md bg-card hover:bg-slate-100 dark:hover:bg-zinc-900 text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-50"
+                    title="刷新数据源"
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 ${isSourceRefreshing ? 'animate-spin text-primary' : ''}`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* 手动局域网连接 */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  手动局域网连接
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={manualSourceAddress}
+                    onChange={(event) => setManualSourceAddress(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        void handleConnectManualSource()
+                      }
+                    }}
+                    placeholder="手动连接 IP:端口"
+                    className="flex-1 bg-background border border-border rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleConnectManualSource()}
+                    disabled={isManualSourceConnecting}
+                    className="px-3 py-1.5 border border-border rounded-md bg-card hover:bg-slate-100 dark:hover:bg-zinc-900 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors shrink-0 disabled:opacity-50"
+                  >
+                    {isManualSourceConnecting ? '连接中' : '连接'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {dataSourceError && (
-              <div className="text-xs font-semibold text-rose-500">{dataSourceError}</div>
+              <div className="text-xs font-semibold text-rose-500 mt-1 flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{dataSourceError}</span>
+              </div>
             )}
+          </div>
 
-            <div className="flex items-center space-x-2 shrink-0">
-              <span className="text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-md uppercase tracking-wider">
-                1. 选择任务标识
+          {/* Right Column: Task Selection & Stats */}
+          <div className="lg:col-span-5 flex flex-col space-y-4 justify-between lg:pl-6 lg:border-l lg:border-border/60">
+            <div className="flex items-center space-x-2 pb-2 border-b border-border/60">
+              <SlidersHorizontal className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                选择任务标识
               </span>
             </div>
 
-            <div className="flex-1 max-w-md">
-              <select
-                value={selectedTaskId}
-                onChange={(e) => {
-                  const val = e.target.value
-                  setSelectedTaskId(val ? Number(val) : '')
-                }}
-                className="w-full bg-background border border-border rounded-md px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-semibold"
-                disabled={isLoadingTasks}
-              >
-                {tasks.map((task) => {
-                  const statusMap: Record<string, string> = {
-                    running: '抓取中',
-                    completed: '已完成',
-                    failed: '已失败',
-                    cancelled: '已终止'
-                  }
-                  return (
-                    <option key={task.id} value={task.id}>
-                      {task.task_name} (任务 ID: {task.id} |{' '}
-                      {task.marketplace === 'amazon.co.jp' ? '日本站' : task.marketplace} |{' '}
-                      {statusMap[task.status] || task.status})
-                    </option>
-                  )
-                })}
-                {tasks.length === 0 && !isLoadingTasks && (
-                  <option value="">-- 当前尚无排行榜采集数据，请先去采集 --</option>
-                )}
-              </select>
-            </div>
-          </div>
+            <div className="flex flex-col sm:flex-row items-stretch gap-4 flex-1">
+              <div className="flex-1 space-y-1.5 min-w-0 flex flex-col justify-center">
+                <select
+                  value={selectedTaskId}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setSelectedTaskId(val ? Number(val) : '')
+                  }}
+                  className="w-full bg-background border border-border rounded-md px-3.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all duration-200 font-semibold"
+                  disabled={isLoadingTasks}
+                >
+                  {tasks.map((task) => {
+                    const statusMap: Record<string, string> = {
+                      running: '抓取中',
+                      completed: '已完成',
+                      failed: '已失败',
+                      cancelled: '已终止'
+                    }
+                    return (
+                      <option key={task.id} value={task.id}>
+                        {task.task_name} (任务 ID: {task.id} |{' '}
+                        {task.marketplace === 'amazon.co.jp' ? '日本站' : task.marketplace} |{' '}
+                        {statusMap[task.status] || task.status})
+                      </option>
+                    )
+                  })}
+                  {tasks.length === 0 && !isLoadingTasks && (
+                    <option value="">-- 当前尚无排行榜采集数据，请先去采集 --</option>
+                  )}
+                </select>
+              </div>
 
-          <div className="text-right shrink-0">
-            <span className="text-xs font-semibold text-muted-foreground uppercase">
-              当前任务关联数
-            </span>
-            <p className="text-xl font-black text-primary mt-0.5">{totalCount} 条商品明细</p>
+              {/* Divider for small screen stats */}
+              <div className="hidden sm:block w-px bg-border/60 self-stretch my-1" />
+
+              <div className="flex flex-col justify-center min-w-[120px] text-left sm:text-right shrink-0">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                  当前任务关联数
+                </span>
+                <p className="text-base font-black text-primary mt-1 whitespace-nowrap">
+                  {totalCount} 条商品明细
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

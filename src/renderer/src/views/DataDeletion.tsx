@@ -126,10 +126,7 @@ export const DataDeletion: React.FC = () => {
   const handleDeleteSingleTask = async (task: ScrawlTask) => {
     if (!window.confirm(`确定要清空任务编号 ${task.id} 的所有明细数据吗？此操作不可逆。`)) return
 
-    setActionLog((prev) => [
-      ...prev,
-      `[物理删除] 开始执行局部物理擦除，正处理任务 [${task.id}]...`
-    ])
+    setActionLog((prev) => [...prev, `[物理删除] 开始执行局部物理擦除，正处理任务 [${task.id}]...`])
     try {
       const res = await window.electron.ipcRenderer.invoke('db:delete-task', task.rawId)
       if (res.success) {
@@ -155,7 +152,8 @@ export const DataDeletion: React.FC = () => {
       return
     }
 
-    if (!window.confirm('确定要清理除最新一次采集之外的所有历史数据包及商品明细吗？此操作不可逆。')) return
+    if (!window.confirm('确定要清理除最新一次采集之外的所有历史数据包及商品明细吗？此操作不可逆。'))
+      return
 
     const latestTask = taskList[0]
     const historyTasks = taskList.slice(1)
@@ -188,7 +186,12 @@ export const DataDeletion: React.FC = () => {
       return
     }
 
-    if (!window.confirm('【高危警告】您确定要一键彻底清空数据库吗？此操作将强制擦除所有任务及明细数据，并执行空间回收，操作完全不可逆！')) return
+    if (
+      !window.confirm(
+        '【高危警告】您确定要一键彻底清空数据库吗？此操作将强制擦除所有任务及明细数据，并执行空间回收，操作完全不可逆！'
+      )
+    )
+      return
 
     const totalRemoved = taskList.reduce((acc, t) => acc + t.skuCount, 0)
 
@@ -264,7 +267,9 @@ export const DataDeletion: React.FC = () => {
                   className="flex items-center justify-center p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
                   title="刷新全部数据"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-primary' : ''}`} />
+                  <RefreshCw
+                    className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-primary' : ''}`}
+                  />
                 </button>
               </div>
             </div>
@@ -481,4 +486,3 @@ export const DataDeletion: React.FC = () => {
   )
 }
 export default DataDeletion
-

@@ -92,9 +92,7 @@ function createAmazonRetryError(failure: AmazonRequestFailure | undefined): Erro
   }
 
   if (failure.kind === 'risk-control') {
-    return new AmazonRiskControlError(
-      `亚马逊页面请求被风控: ${getErrorMessage(failure.error)}`
-    )
+    return new AmazonRiskControlError(`亚马逊页面请求被风控: ${getErrorMessage(failure.error)}`)
   }
 
   return new Error(`亚马逊页面请求异常: ${getErrorMessage(failure.error)}`)

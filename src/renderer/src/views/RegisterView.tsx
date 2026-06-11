@@ -81,9 +81,7 @@ export const RegisterView: React.FC = () => {
             <h1 className="font-extrabold text-xl text-slate-800 dark:text-slate-100">
               注册新用户账号
             </h1>
-            <p className="text-[11px] text-muted-foreground">
-              请输入以下注册信息以获取工作台权限
-            </p>
+            <p className="text-[11px] text-muted-foreground">请输入以下注册信息以获取工作台权限</p>
           </div>
         </div>
 

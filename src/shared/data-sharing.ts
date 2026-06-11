@@ -34,6 +34,7 @@ export interface SharedDataSource {
   baseUrl: string
   deviceId: string
   hostname?: string
+  sourceType?: 'mdns' | 'manual' | 'cache'
   lastSeenAt: string
 }
 
@@ -42,6 +43,7 @@ export interface DataSharingStatus {
   running: boolean
   port: number | null
   baseUrl: string | null
+  baseUrls?: string[]
   deviceId: string
   displayName: string
   error?: string
@@ -50,6 +52,7 @@ export interface DataSharingStatus {
 export interface DataSharingApi {
   getStatus: () => Promise<DataSharingStatus>
   discoverSources: () => Promise<SharedDataSource[]>
+  connectManualSource: (host: string, port: number) => Promise<SharedDataSource>
   getRemoteTasks: (source: SharedDataSource) => Promise<unknown[]>
   getRemoteCategories: (source: SharedDataSource, taskId: number) => Promise<string[]>
   getRemoteSellerTypes: (source: SharedDataSource, taskId: number) => Promise<string[]>
@@ -66,10 +69,7 @@ export interface DataSharingApi {
     keywordId: number
   ) => Promise<unknown[]>
   getRemoteProductBsrRanks: (source: SharedDataSource, productId: number) => Promise<unknown[]>
-  markRemoteSearchKeywordAsRead: (
-    source: SharedDataSource,
-    keywordId: number
-  ) => Promise<boolean>
+  markRemoteSearchKeywordAsRead: (source: SharedDataSource, keywordId: number) => Promise<boolean>
   markRemoteProductAsRead: (source: SharedDataSource, productId: number) => Promise<boolean>
 }
 
@@ -88,7 +88,11 @@ export function isSharedDataSource(value: unknown): value is SharedDataSource {
     typeof source.baseUrl === 'string' &&
     typeof source.deviceId === 'string' &&
     typeof source.lastSeenAt === 'string' &&
-    (source.hostname === undefined || typeof source.hostname === 'string')
+    (source.hostname === undefined || typeof source.hostname === 'string') &&
+    (source.sourceType === undefined ||
+      source.sourceType === 'mdns' ||
+      source.sourceType === 'manual' ||
+      source.sourceType === 'cache')
   )
 }
 
@@ -104,6 +108,9 @@ export function isDataSharingStatus(value: unknown): value is DataSharingStatus 
     typeof status.running === 'boolean' &&
     (status.port === null || typeof status.port === 'number') &&
     (status.baseUrl === null || typeof status.baseUrl === 'string') &&
+    (status.baseUrls === undefined ||
+      (Array.isArray(status.baseUrls) &&
+        status.baseUrls.every((baseUrl) => typeof baseUrl === 'string'))) &&
     typeof status.deviceId === 'string' &&
     typeof status.displayName === 'string' &&
     (status.error === undefined || typeof status.error === 'string')

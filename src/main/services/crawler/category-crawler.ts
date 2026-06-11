@@ -265,14 +265,11 @@ export class AmazonCategoryCrawler {
     onProgress: CrawlerProgressHandler,
     signal?: AbortSignal
   ): Promise<string> {
-    return await retryWithCrawlerRecovery(
-      () => amazonClient.fetchHtml(url, cookies, signal),
-      {
-        scope: `${scope} | URL: ${url}`,
-        onProgress,
-        signal
-      }
-    )
+    return await retryWithCrawlerRecovery(() => amazonClient.fetchHtml(url, cookies, signal), {
+      scope: `${scope} | URL: ${url}`,
+      onProgress,
+      signal
+    })
   }
 
   private throwIfCancelled(signal?: AbortSignal): void {

@@ -143,10 +143,7 @@ export function parseAmazonSearchKeywordHtml(
     const delivery = findDelivery($, $card)
     if (!delivery) continue
 
-    if (
-      delivery.days < config.minDeliveryInterval ||
-      delivery.days > config.maxDeliveryInterval
-    ) {
+    if (delivery.days < config.minDeliveryInterval || delivery.days > config.maxDeliveryInterval) {
       continue
     }
 

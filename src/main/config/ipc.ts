@@ -59,6 +59,7 @@ export const IPC_CHANNEL = {
   DATA_SHARING: {
     GET_STATUS: 'data-sharing:get-status',
     DISCOVER_SOURCES: 'data-sharing:discover-sources',
+    CONNECT_MANUAL_SOURCE: 'data-sharing:connect-manual-source',
     GET_REMOTE_TASKS: 'data-sharing:get-remote-tasks',
     GET_REMOTE_CATEGORIES: 'data-sharing:get-remote-categories',
     GET_REMOTE_SELLER_TYPES: 'data-sharing:get-remote-seller-types',

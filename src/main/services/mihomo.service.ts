@@ -442,8 +442,15 @@ function sanitizeNodeId(name: string, index: number): string {
 function getDefaultMihomoBinaryPath(): string {
   const platformArch = getMihomoPlatformArch()
   const asset = getMihomoCoreReleaseAsset(platformArch)
-  const executableName = asset?.executableName || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo')
-  return join(app.getPath('userData'), 'mihomo-core', MIHOMO_CORE_VERSION, platformArch, executableName)
+  const executableName =
+    asset?.executableName || (process.platform === 'win32' ? 'mihomo.exe' : 'mihomo')
+  return join(
+    app.getPath('userData'),
+    'mihomo-core',
+    MIHOMO_CORE_VERSION,
+    platformArch,
+    executableName
+  )
 }
 
 async function ensureMihomoBinaryExecutable(binaryPath: string): Promise<void> {
@@ -491,7 +498,11 @@ function findZipEndOfCentralDirectory(buffer: Buffer): number {
     buffer.length - ZIP_MIN_END_OF_CENTRAL_DIRECTORY_SIZE - ZIP_MAX_COMMENT_SIZE
   )
 
-  for (let offset = buffer.length - ZIP_MIN_END_OF_CENTRAL_DIRECTORY_SIZE; offset >= searchStart; offset--) {
+  for (
+    let offset = buffer.length - ZIP_MIN_END_OF_CENTRAL_DIRECTORY_SIZE;
+    offset >= searchStart;
+    offset--
+  ) {
     if (buffer.readUInt32LE(offset) === ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE) {
       return offset
     }
@@ -510,10 +521,7 @@ function getZipEntryDataOffset(buffer: Buffer, localHeaderOffset: number): numbe
   return localHeaderOffset + 30 + fileNameLength + extraFieldLength
 }
 
-async function extractExecutableFromZip(
-  buffer: Buffer,
-  executableName: string
-): Promise<Buffer> {
+async function extractExecutableFromZip(buffer: Buffer, executableName: string): Promise<Buffer> {
   const endOfCentralDirectoryOffset = findZipEndOfCentralDirectory(buffer)
   const centralDirectorySize = buffer.readUInt32LE(endOfCentralDirectoryOffset + 12)
   const centralDirectoryOffset = buffer.readUInt32LE(endOfCentralDirectoryOffset + 16)
@@ -531,9 +539,7 @@ async function extractExecutableFromZip(
     const extraFieldLength = buffer.readUInt16LE(offset + 30)
     const fileCommentLength = buffer.readUInt16LE(offset + 32)
     const localHeaderOffset = buffer.readUInt32LE(offset + 42)
-    const fileName = buffer
-      .subarray(offset + 46, offset + 46 + fileNameLength)
-      .toString('utf-8')
+    const fileName = buffer.subarray(offset + 46, offset + 46 + fileNameLength).toString('utf-8')
     const isExecutableEntry = basename(fileName).toLowerCase() === executableName.toLowerCase()
 
     if (isExecutableEntry) {
@@ -569,7 +575,10 @@ async function extractMihomoCoreArchive(
   return await extractExecutableFromZip(archive, executableName)
 }
 
-function normalizeSubscriptionNode(rawNode: unknown, index: number): Record<string, unknown> | null {
+function normalizeSubscriptionNode(
+  rawNode: unknown,
+  index: number
+): Record<string, unknown> | null {
   if (!isRecord(rawNode) || typeof rawNode.name !== 'string' || typeof rawNode.type !== 'string') {
     return null
   }
@@ -577,7 +586,9 @@ function normalizeSubscriptionNode(rawNode: unknown, index: number): Record<stri
   return { ...rawNode, name: rawNode.name.trim() || `node-${index + 1}` }
 }
 
-function ensureUniqueNodeNames(nodes: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+function ensureUniqueNodeNames(
+  nodes: Array<Record<string, unknown>>
+): Array<Record<string, unknown>> {
   const seen = new Map<string, number>()
 
   return nodes.map((node) => {
@@ -657,7 +668,8 @@ class MihomoService {
       enabled: settings.mihomoEnabled && settings.proxyMode === 'mihomo-node-pool',
       running: Boolean(this.process && !this.process.killed),
       mode: settings.proxyMode === 'mihomo-node-pool' ? 'node-pool' : 'disabled',
-      controllerUrl: this.controllerUrl || `http://${MIHOMO_CONTROLLER_HOST}:${settings.mihomoControllerPort}`,
+      controllerUrl:
+        this.controllerUrl || `http://${MIHOMO_CONTROLLER_HOST}:${settings.mihomoControllerPort}`,
       nodeCount: this.nodes.length,
       activeNodeId: this.nodes.find((node) => node.alive)?.id || null,
       error: this.lastError || undefined
@@ -747,9 +759,7 @@ class MihomoService {
         settings.mihomoMaxNodeCount > 0
           ? normalizedNodes.slice(0, settings.mihomoMaxNodeCount)
           : normalizedNodes
-      const nodes = ensureUniqueNodeNames(
-        selectedNodes
-      )
+      const nodes = ensureUniqueNodeNames(selectedNodes)
 
       if (nodes.length === 0) {
         throw new Error('订阅中没有解析到可用节点。')

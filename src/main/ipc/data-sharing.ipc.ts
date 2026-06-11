@@ -10,6 +10,10 @@ import type {
 export function registerDataSharingIPC(): void {
   handleIpc(IPC_CHANNEL.DATA_SHARING.GET_STATUS, () => dataSharingService.getStatus())
   handleIpc(IPC_CHANNEL.DATA_SHARING.DISCOVER_SOURCES, () => dataSharingService.discoverSources())
+  handleIpc<[string, number], SharedDataSource>(
+    IPC_CHANNEL.DATA_SHARING.CONNECT_MANUAL_SOURCE,
+    (_event, host, port) => dataSharingService.connectManualSource(host, port)
+  )
   handleIpc<[SharedDataSource], unknown[]>(
     IPC_CHANNEL.DATA_SHARING.GET_REMOTE_TASKS,
     (_event, source) => dataSharingService.getRemoteTasks(source)
@@ -29,9 +33,8 @@ export function registerDataSharingIPC(): void {
   handleIpc<
     [SharedDataSource, DataSharingSearchKeywordQueryFilter],
     { total: number; list: unknown[] }
-  >(
-    IPC_CHANNEL.DATA_SHARING.QUERY_REMOTE_SEARCH_KEYWORDS,
-    (_event, source, filter) => dataSharingService.queryRemoteSearchKeywords(source, filter)
+  >(IPC_CHANNEL.DATA_SHARING.QUERY_REMOTE_SEARCH_KEYWORDS, (_event, source, filter) =>
+    dataSharingService.queryRemoteSearchKeywords(source, filter)
   )
   handleIpc<[SharedDataSource, number], unknown[]>(
     IPC_CHANNEL.DATA_SHARING.GET_REMOTE_SEARCH_KEYWORD_PRODUCTS,

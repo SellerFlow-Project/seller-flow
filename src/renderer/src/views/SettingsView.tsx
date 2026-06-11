@@ -209,9 +209,13 @@ export const SettingsView: React.FC = () => {
       setDraftSettings(savedSettings)
       applyApplicationSettings(savedSettings.application)
       const sharingStatus = await window.api.dataSharing.getStatus()
+      const sharingBaseUrls =
+        sharingStatus.baseUrls && sharingStatus.baseUrls.length > 0
+          ? sharingStatus.baseUrls.join('，')
+          : sharingStatus.baseUrl || ''
       setSharingStatusText(
         sharingStatus.running
-          ? `数据共享服务已启动：${sharingStatus.baseUrl || ''}`
+          ? `数据共享服务已启动：${sharingBaseUrls}`
           : sharingStatus.enabled
             ? `数据共享服务未能启动：${sharingStatus.error || '未知错误'}`
             : '数据共享服务已关闭。'
@@ -755,8 +759,8 @@ export const SettingsView: React.FC = () => {
                               </p>
                               {mihomoCoreInfo && !mihomoCoreInfo.supported && (
                                 <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                                  当前平台 {mihomoCoreInfo.platformArch} 暂不支持自动下载，请手动填写
-                                  Core 路径。
+                                  当前平台 {mihomoCoreInfo.platformArch}{' '}
+                                  暂不支持自动下载，请手动填写 Core 路径。
                                 </p>
                               )}
                             </div>
@@ -764,7 +768,8 @@ export const SettingsView: React.FC = () => {
                               type="button"
                               onClick={() => void handleDownloadMihomoCore()}
                               disabled={
-                                isDownloadingMihomoCore || Boolean(mihomoCoreInfo && !mihomoCoreInfo.supported)
+                                isDownloadingMihomoCore ||
+                                Boolean(mihomoCoreInfo && !mihomoCoreInfo.supported)
                               }
                               className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                             >
@@ -788,7 +793,9 @@ export const SettingsView: React.FC = () => {
                         <input
                           type="text"
                           value={crawling.mihomoBinaryPath}
-                          onChange={(e) => updateCrawlingDraft({ mihomoBinaryPath: e.target.value })}
+                          onChange={(e) =>
+                            updateCrawlingDraft({ mihomoBinaryPath: e.target.value })
+                          }
                           placeholder="留空则使用自动下载目录；也可以填写自定义 Mihomo Core 路径"
                           className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
                         />
@@ -835,8 +842,9 @@ export const SettingsView: React.FC = () => {
                           <option value="lowest-latency">优先最低延迟</option>
                         </select>
                         <p className="text-[10px] text-muted-foreground">
-                          默认策略会让分类/翻页固定使用一个节点 10 分钟，商品详情子任务固定使用一个节点
-                          2 分钟；二者独立轮换，遇到对应请求类型的明确风控或冷却时才单独切换。
+                          默认策略会让分类/翻页固定使用一个节点 10
+                          分钟，商品详情子任务固定使用一个节点 2
+                          分钟；二者独立轮换，遇到对应请求类型的明确风控或冷却时才单独切换。
                         </p>
                       </div>
 
@@ -952,7 +960,11 @@ export const SettingsView: React.FC = () => {
                                 }`}
                                 title={node.lastError || ''}
                               >
-                                {node.latency == null ? (node.alive ? '未测' : '失败') : `${node.latency}ms`}
+                                {node.latency == null
+                                  ? node.alive
+                                    ? '未测'
+                                    : '失败'
+                                  : `${node.latency}ms`}
                               </span>
                               <div className="col-span-2 text-right">
                                 <button

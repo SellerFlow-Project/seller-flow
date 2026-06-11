@@ -9,10 +9,7 @@ import type {
   AmazonSearchStopResult,
   AmazonSearchRunState
 } from '../../shared/amazon-search'
-import {
-  AMAZON_SEARCH_TASK_TYPE,
-  AMAZON_SEARCH_TASK_TYPE_NAME
-} from '../../shared/amazon-search'
+import { AMAZON_SEARCH_TASK_TYPE, AMAZON_SEARCH_TASK_TYPE_NAME } from '../../shared/amazon-search'
 import type { Amz123HotwordRow, Amz123RangeRequest } from './amz123.service'
 import { amz123Service, buildAmz123RangeRequests } from './amz123.service'
 import {
@@ -231,15 +228,11 @@ class AmazonSearchService {
       const keywords = await this.fetchAllKeywordWorkItems(config, amz123Token, signal)
       this.metrics.totalKeywords = keywords.length
       this.broadcastState()
-      this.sendLog(`[AMZ123] 去重后共获取 ${keywords.length} 个搜索词，开始逐词筛选 Amazon 搜索结果。`)
-
-      await this.processKeywordsConcurrently(
-        taskId,
-        keywords,
-        config,
-        cookieResult.cookies,
-        signal
+      this.sendLog(
+        `[AMZ123] 去重后共获取 ${keywords.length} 个搜索词，开始逐词筛选 Amazon 搜索结果。`
       )
+
+      await this.processKeywordsConcurrently(taskId, keywords, config, cookieResult.cookies, signal)
 
       if (this.isStopping) {
         this.tryUpdateTaskStatus(taskId, CRAWL_TASK_STATUS.CANCELLED)
@@ -434,7 +427,9 @@ class AmazonSearchService {
         this.metrics.processedKeywords++
       }
       this.metrics.failedKeywords++
-      this.sendLog(`[警告] 搜索词 "${item.keyword}" 处理失败，继续下一个：${getErrorMessage(error)}`)
+      this.sendLog(
+        `[警告] 搜索词 "${item.keyword}" 处理失败，继续下一个：${getErrorMessage(error)}`
+      )
     }
   }
 
@@ -443,7 +438,9 @@ class AmazonSearchService {
     keyword: string,
     signal?: AbortSignal
   ) {
-    const asins = products.map((product) => product.asin).filter((asin): asin is string => Boolean(asin))
+    const asins = products
+      .map((product) => product.asin)
+      .filter((asin): asin is string => Boolean(asin))
     if (asins.length === 0) return null
 
     this.sendLog(`[卖家精灵] 搜索词 "${keyword}" 正在请求 ${asins.length} 个商品的竞品分析数据。`)
@@ -517,7 +514,9 @@ class AmazonSearchService {
 
   private handleUnexpectedBackgroundError(taskId: number, error: unknown): void {
     const status =
-      this.isStopping || isAbortError(error) ? CRAWL_TASK_STATUS.CANCELLED : CRAWL_TASK_STATUS.FAILED
+      this.isStopping || isAbortError(error)
+        ? CRAWL_TASK_STATUS.CANCELLED
+        : CRAWL_TASK_STATUS.FAILED
     this.tryUpdateTaskStatus(taskId, status)
     this.sendLog(`[错误] 搜索词采集后台异常: ${getErrorMessage(error)}`)
     this.resetTask(taskId)
