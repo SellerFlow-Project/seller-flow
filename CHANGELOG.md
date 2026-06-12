@@ -4,6 +4,10 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-06-12
+
+- 修复下载 mihomo 内核会出现错误的 bug
+
 ## [0.2.1] - 2026-06-11
 
 - 局域网服务发现扫描时间从 2.5s 提高到 6s 以增加扫描成功率

@@ -521,6 +521,19 @@ function getZipEntryDataOffset(buffer: Buffer, localHeaderOffset: number): numbe
   return localHeaderOffset + 30 + fileNameLength + extraFieldLength
 }
 
+function isMihomoZipExecutableEntry(fileName: string, executableName: string): boolean {
+  const entryName = basename(fileName).toLowerCase()
+  const expectedName = executableName.toLowerCase()
+
+  if (entryName === expectedName) return true
+
+  if (expectedName.endsWith('.exe')) {
+    return entryName.startsWith('mihomo') && entryName.endsWith('.exe')
+  }
+
+  return entryName === 'mihomo' || (entryName.startsWith('mihomo') && !entryName.includes('.'))
+}
+
 async function extractExecutableFromZip(buffer: Buffer, executableName: string): Promise<Buffer> {
   const endOfCentralDirectoryOffset = findZipEndOfCentralDirectory(buffer)
   const centralDirectorySize = buffer.readUInt32LE(endOfCentralDirectoryOffset + 12)
@@ -540,7 +553,7 @@ async function extractExecutableFromZip(buffer: Buffer, executableName: string):
     const fileCommentLength = buffer.readUInt16LE(offset + 32)
     const localHeaderOffset = buffer.readUInt32LE(offset + 42)
     const fileName = buffer.subarray(offset + 46, offset + 46 + fileNameLength).toString('utf-8')
-    const isExecutableEntry = basename(fileName).toLowerCase() === executableName.toLowerCase()
+    const isExecutableEntry = isMihomoZipExecutableEntry(fileName, executableName)
 
     if (isExecutableEntry) {
       const dataOffset = getZipEntryDataOffset(buffer, localHeaderOffset)
@@ -560,7 +573,7 @@ async function extractExecutableFromZip(buffer: Buffer, executableName: string):
     offset += 46 + fileNameLength + extraFieldLength + fileCommentLength
   }
 
-  throw new Error(`Mihomo Core ZIP 解压失败：未找到 ${executableName}。`)
+  throw new Error(`Mihomo Core ZIP 解压失败：未找到 ${executableName} 或 mihomo 可执行文件。`)
 }
 
 async function extractMihomoCoreArchive(

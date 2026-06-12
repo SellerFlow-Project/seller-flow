@@ -119,6 +119,8 @@ export const SettingsView: React.FC = () => {
   const [testingNodeId, setTestingNodeId] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [mihomoCoreError, setMihomoCoreError] = useState('')
+  const [mihomoActionError, setMihomoActionError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [updateActionError, setUpdateActionError] = useState('')
 
@@ -135,6 +137,8 @@ export const SettingsView: React.FC = () => {
         if (active) {
           setDraftSettings(settings)
           setSaveError('')
+          setMihomoCoreError('')
+          setMihomoActionError('')
           void refreshMihomoState()
           void refreshMihomoCoreInfo()
         }
@@ -240,6 +244,7 @@ export const SettingsView: React.FC = () => {
 
   const refreshMihomoState = async (): Promise<void> => {
     try {
+      setMihomoActionError('')
       const [status, nodes] = await Promise.all([
         window.api.mihomo.getStatus(),
         window.api.mihomo.listNodes()
@@ -254,21 +259,23 @@ export const SettingsView: React.FC = () => {
       )
     } catch (error) {
       setMihomoStatusText(`读取 Mihomo 状态失败：${String(error)}`)
+      setMihomoActionError(`读取 Mihomo 状态失败：${String(error)}`)
     }
   }
 
   const refreshMihomoCoreInfo = async (): Promise<void> => {
     try {
+      setMihomoCoreError('')
       const coreInfo = await window.api.mihomo.getCoreInfo()
       setMihomoCoreInfo(coreInfo)
     } catch (error) {
-      setSaveError(`读取 Mihomo Core 信息失败：${String(error)}`)
+      setMihomoCoreError(`读取 Mihomo Core 信息失败：${String(error)}`)
     }
   }
 
   const handleDownloadMihomoCore = async (): Promise<void> => {
     setIsDownloadingMihomoCore(true)
-    setSaveError('')
+    setMihomoCoreError('')
     try {
       const coreInfo = await window.api.mihomo.downloadCore()
       setMihomoCoreInfo(coreInfo)
@@ -277,7 +284,7 @@ export const SettingsView: React.FC = () => {
         `Mihomo Core ${coreInfo.version} 下载完成，默认路径：${coreInfo.defaultBinaryPath}`
       )
     } catch (error) {
-      setSaveError(`下载 Mihomo Core 失败：${String(error)}`)
+      setMihomoCoreError(`下载 Mihomo Core 失败：${String(error)}`)
     } finally {
       setIsDownloadingMihomoCore(false)
     }
@@ -285,7 +292,7 @@ export const SettingsView: React.FC = () => {
 
   const handleRefreshMihomoSubscription = async (): Promise<void> => {
     setIsRefreshingMihomo(true)
-    setSaveError('')
+    setMihomoActionError('')
     try {
       const savedSettings = await window.api.settings.save(draftSettings)
       setDraftSettings(savedSettings)
@@ -298,7 +305,7 @@ export const SettingsView: React.FC = () => {
           : `订阅刷新失败：${status.error || 'Mihomo Core 未启动。'}`
       )
     } catch (error) {
-      setSaveError(`刷新 Mihomo 订阅失败：${String(error)}`)
+      setMihomoActionError(`刷新 Mihomo 订阅失败：${String(error)}`)
     } finally {
       setIsRefreshingMihomo(false)
     }
@@ -312,7 +319,7 @@ export const SettingsView: React.FC = () => {
         currentNodes.map((node) => (node.id === testedNode.id ? testedNode : node))
       )
     } catch (error) {
-      setSaveError(`节点测速失败：${String(error)}`)
+      setMihomoActionError(`节点测速失败：${String(error)}`)
     } finally {
       setTestingNodeId('')
     }
@@ -789,6 +796,11 @@ export const SettingsView: React.FC = () => {
                             路径留空时使用上方自动下载的 Core；填写自定义路径时会优先使用自定义
                             Core。
                           </p>
+                          {mihomoCoreError && (
+                            <p className="text-[10px] font-semibold text-red-500">
+                              {mihomoCoreError}
+                            </p>
+                          )}
                         </div>
                         <input
                           type="text"
@@ -926,6 +938,11 @@ export const SettingsView: React.FC = () => {
                       <span className="text-[11px] text-muted-foreground">
                         {mihomoStatusText || '保存配置后，Mihomo 节点池状态会显示在这里。'}
                       </span>
+                      {mihomoActionError && (
+                        <span className="text-[11px] font-semibold text-red-500">
+                          {mihomoActionError}
+                        </span>
+                      )}
                     </div>
 
                     <div className="border border-border/70 rounded-lg overflow-hidden bg-background/70">
