@@ -20,7 +20,7 @@ import { useAppStore } from '../store/appStore'
 import type { AccountRole, AccountUser, AuditLog, RegistrationCode } from '../../../shared/account'
 
 const ACCOUNT_ROLE_LABELS: Record<AccountRole, string> = {
-  user: '普通用户',
+  user: '试用账号',
   staff: '运营人员',
   admin: '管理员',
   super_admin: '超级管理员'

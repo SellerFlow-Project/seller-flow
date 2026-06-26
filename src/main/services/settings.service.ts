@@ -2,9 +2,8 @@ import Store from 'electron-store'
 import { randomUUID } from 'crypto'
 import {
   DEFAULT_SELLER_FLOW_SETTINGS,
+  DEMO_MIHOMO_SUBSCRIPTION_URL,
   type ApplicationSettings,
-  type CrawlerProxyMode,
-  type CrawlerProxyNodeStrategy,
   type CrawlingSettings,
   type SellerFlowSettings,
   type ThemeColor,
@@ -19,13 +18,6 @@ interface SettingsStore {
 const THEME_MODES = new Set<ThemeMode>(['light', 'dark'])
 const THEME_COLORS = new Set<ThemeColor>(['blue', 'emerald', 'violet', 'amber', 'rose'])
 const UI_SCALE_MODES = new Set<UiScaleMode>(['auto', '0.8', '0.9', '1.0', '1.1', '1.2', '1.5'])
-const CRAWLER_PROXY_MODES = new Set<CrawlerProxyMode>(['direct', 'mihomo-node-pool'])
-const CRAWLER_PROXY_NODE_STRATEGIES = new Set<CrawlerProxyNodeStrategy>([
-  'sticky-10-minutes',
-  'round-robin',
-  'random',
-  'lowest-latency'
-])
 
 let store: Store<SettingsStore> | undefined
 
@@ -64,12 +56,9 @@ export function normalizeSettings(value: unknown): SellerFlowSettings {
   const ai = getRecord(settings.ai)
   const dataSharing = getRecord(settings.dataSharing)
   const minDelay = getNumber(crawling.minDelay, DEFAULT_SELLER_FLOW_SETTINGS.crawling.minDelay, 0)
-  const rawMihomoMaxNodeCount = Math.floor(
-    getNumber(
-      crawling.mihomoMaxNodeCount,
-      DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoMaxNodeCount,
-      -1
-    )
+  const mihomoEnabled = getBoolean(
+    crawling.mihomoEnabled,
+    DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoEnabled
   )
   const dataSharingDeviceId = getString(
     dataSharing.deviceId,
@@ -119,59 +108,19 @@ export function normalizeSettings(value: unknown): SellerFlowSettings {
         crawling.clearHistoryOnNewTask,
         DEFAULT_SELLER_FLOW_SETTINGS.crawling.clearHistoryOnNewTask
       ),
-      concurrencyCount: Math.floor(
-        getNumber(
-          crawling.concurrencyCount,
-          DEFAULT_SELLER_FLOW_SETTINGS.crawling.concurrencyCount,
-          1
-        )
-      ),
       minDelay,
       maxDelay: Math.max(
         minDelay,
         getNumber(crawling.maxDelay, DEFAULT_SELLER_FLOW_SETTINGS.crawling.maxDelay, 0)
       ),
-      proxyMode: CRAWLER_PROXY_MODES.has(crawling.proxyMode as CrawlerProxyMode)
-        ? (crawling.proxyMode as CrawlerProxyMode)
-        : DEFAULT_SELLER_FLOW_SETTINGS.crawling.proxyMode,
-      proxyNodeStrategy: CRAWLER_PROXY_NODE_STRATEGIES.has(
-        crawling.proxyNodeStrategy as CrawlerProxyNodeStrategy
-      )
-        ? (crawling.proxyNodeStrategy as CrawlerProxyNodeStrategy)
-        : DEFAULT_SELLER_FLOW_SETTINGS.crawling.proxyNodeStrategy,
-      mihomoEnabled: getBoolean(
-        crawling.mihomoEnabled,
-        DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoEnabled
-      ),
-      mihomoSubscriptionUrl: getString(
-        crawling.mihomoSubscriptionUrl,
-        DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoSubscriptionUrl
-      ),
-      mihomoBinaryPath: getString(
-        crawling.mihomoBinaryPath,
-        DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoBinaryPath
-      ),
-      mihomoControllerPort: Math.floor(
-        getNumber(
-          crawling.mihomoControllerPort,
-          DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoControllerPort,
-          1
-        )
-      ),
-      mihomoMixedPortStart: Math.floor(
-        getNumber(
-          crawling.mihomoMixedPortStart,
-          DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoMixedPortStart,
-          1
-        )
-      ),
-      mihomoMaxNodeCount: Math.floor(
-        rawMihomoMaxNodeCount < 0 ? -1 : Math.max(1, rawMihomoMaxNodeCount)
-      ),
-      mihomoHealthCheckUrl: getString(
-        crawling.mihomoHealthCheckUrl,
-        DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoHealthCheckUrl
-      )
+      proxyNodeStrategy: DEFAULT_SELLER_FLOW_SETTINGS.crawling.proxyNodeStrategy,
+      mihomoEnabled,
+      mihomoSubscriptionUrl: DEMO_MIHOMO_SUBSCRIPTION_URL,
+      mihomoBinaryPath: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoBinaryPath,
+      mihomoControllerPort: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoControllerPort,
+      mihomoMixedPortStart: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoMixedPortStart,
+      mihomoMaxNodeCount: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoMaxNodeCount,
+      mihomoHealthCheckUrl: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoHealthCheckUrl
     },
     ai: {
       textApiEndpoint: getString(

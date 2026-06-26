@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import {
   DEFAULT_SELLER_FLOW_SETTINGS,
+  DEMO_MIHOMO_SUBSCRIPTION_URL,
   type AiSettings,
   type ApplicationSettings,
   type CrawlingSettings,
@@ -34,6 +35,8 @@ import type { MihomoCoreInfo, MihomoProxyNode } from '../../../shared/mihomo'
 import type { AppUpdateState } from '../../../shared/update'
 import { useAppStore } from '../store/appStore'
 import { useAppUpdater } from '../hooks/useAppUpdater'
+
+const SHOW_MIHOMO_ADVANCED_PANEL = false
 
 // Nested Toggle Switch Component for UI Consistency
 interface ToggleSwitchProps {
@@ -182,6 +185,19 @@ export const SettingsView: React.FC = () => {
         ...settings
       }
     }))
+  }
+
+  const updateMihomoDemoEnabled = (mihomoEnabled: boolean): void => {
+    updateCrawlingDraft({
+      mihomoEnabled,
+      proxyNodeStrategy: DEFAULT_SELLER_FLOW_SETTINGS.crawling.proxyNodeStrategy,
+      mihomoSubscriptionUrl: DEMO_MIHOMO_SUBSCRIPTION_URL,
+      mihomoBinaryPath: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoBinaryPath,
+      mihomoControllerPort: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoControllerPort,
+      mihomoMixedPortStart: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoMixedPortStart,
+      mihomoMaxNodeCount: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoMaxNodeCount,
+      mihomoHealthCheckUrl: DEFAULT_SELLER_FLOW_SETTINGS.crawling.mihomoHealthCheckUrl
+    })
   }
 
   const updateAiDraft = (settings: Partial<AiSettings>): void => {
@@ -655,25 +671,8 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Concurrency and Delay Configs */}
+                {/* Delay Configs */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  {/* Concurrency Count */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                      <Server className="w-3.5 h-3.5 text-primary" />
-                      <span>并发数</span>
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      value={crawling.concurrencyCount}
-                      onChange={(e) =>
-                        updateCrawlingDraft({ concurrencyCount: Number(e.target.value) })
-                      }
-                      className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                    />
-                  </div>
-
                   {/* Random Delay */}
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
@@ -702,304 +701,341 @@ export const SettingsView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Mihomo Proxy Pool */}
+                {/* Mihomo Demo Proxy Pool */}
                 <div className="space-y-4 pt-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-                      <Network className="w-3.5 h-3.5 text-primary" />
-                      <span>Mihomo 订阅节点池</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => void refreshMihomoState()}
-                      className="px-2.5 py-1.5 rounded-md border border-border text-[11px] font-semibold hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>刷新状态</span>
-                    </button>
-                  </div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <Network className="w-3.5 h-3.5 text-primary" />
+                    <span>代理池</span>
+                  </label>
 
                   <div className="bg-slate-50 dark:bg-zinc-900/20 border border-border/80 rounded-xl p-4 space-y-4">
-                    <ToggleSwitch
-                      checked={crawling.mihomoEnabled}
-                      onChange={(mihomoEnabled) =>
-                        updateCrawlingDraft({
-                          mihomoEnabled,
-                          proxyMode: mihomoEnabled ? 'mihomo-node-pool' : 'direct'
-                        })
-                      }
-                      label="启用 Mihomo 节点池代理"
-                      description="开启后仅软件内部亚马逊爬虫请求会通过本机 Mihomo 节点池转发，不修改系统代理，也不会影响其它软件。"
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                          <Globe2 className="w-3 h-3" />
-                          <span>Clash / Mihomo 订阅链接</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={crawling.mihomoSubscriptionUrl}
-                          onChange={(e) =>
-                            updateCrawlingDraft({ mihomoSubscriptionUrl: e.target.value })
-                          }
-                          placeholder="https://example.com/clash.yaml"
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          Mihomo Core 路径
-                        </label>
-                        <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="space-y-1">
-                              <p className="text-xs font-semibold text-foreground">
-                                默认在线 Core：
-                                {mihomoCoreInfo?.version || '读取中'}
-                              </p>
-                              <p className="break-all text-[10px] leading-relaxed text-muted-foreground">
-                                {mihomoCoreInfo?.defaultBinaryPath ||
-                                  '留空路径时会使用用户数据目录中的 Mihomo Core。'}
-                              </p>
-                              {mihomoCoreInfo && !mihomoCoreInfo.supported && (
-                                <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                                  当前平台 {mihomoCoreInfo.platformArch}{' '}
-                                  暂不支持自动下载，请手动填写 Core 路径。
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => void handleDownloadMihomoCore()}
-                              disabled={
-                                isDownloadingMihomoCore ||
-                                Boolean(mihomoCoreInfo && !mihomoCoreInfo.supported)
-                              }
-                              className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Download
-                                className={`h-3.5 w-3.5 ${isDownloadingMihomoCore ? 'animate-pulse' : ''}`}
-                              />
-                              <span>
-                                {isDownloadingMihomoCore
-                                  ? '正在下载...'
-                                  : mihomoCoreInfo?.installed
-                                    ? '重新下载 Core'
-                                    : '下载 Core'}
-                              </span>
-                            </button>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground">
-                            路径留空时使用上方自动下载的 Core；填写自定义路径时会优先使用自定义
-                            Core。
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/70 p-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-xs font-semibold text-foreground">下载核心插件</p>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          在线联网下载代理池必要的相关插件。下载后会保存在用户数据目录，后续无需重复下载。
+                        </p>
+                        <p className="break-all text-[10px] leading-relaxed text-muted-foreground">
+                          {mihomoCoreInfo?.defaultBinaryPath ||
+                            '留空路径时会使用用户数据目录中的插件。'}
+                        </p>
+                        {mihomoCoreInfo && !mihomoCoreInfo.supported && (
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                            当前平台 {mihomoCoreInfo.platformArch} 暂不支持自动下载。
                           </p>
-                          {mihomoCoreError && (
-                            <p className="text-[10px] font-semibold text-red-500">
-                              {mihomoCoreError}
-                            </p>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          value={crawling.mihomoBinaryPath}
-                          onChange={(e) =>
-                            updateCrawlingDraft({ mihomoBinaryPath: e.target.value })
-                          }
-                          placeholder="留空则使用自动下载目录；也可以填写自定义 Mihomo Core 路径"
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                        />
+                        )}
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          爬取代理模式
-                        </label>
-                        <select
-                          value={crawling.proxyMode}
-                          onChange={(e) =>
-                            updateCrawlingDraft({
-                              proxyMode: e.target.value as CrawlingSettings['proxyMode'],
-                              mihomoEnabled: e.target.value === 'mihomo-node-pool'
-                            })
-                          }
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
-                        >
-                          <option value="direct">直连</option>
-                          <option value="mihomo-node-pool">Mihomo 节点池</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          节点选择策略
-                        </label>
-                        <select
-                          value={crawling.proxyNodeStrategy}
-                          onChange={(e) =>
-                            updateCrawlingDraft({
-                              proxyNodeStrategy: e.target
-                                .value as CrawlingSettings['proxyNodeStrategy']
-                            })
-                          }
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
-                        >
-                          <option value="sticky-10-minutes">
-                            定时粘性轮换（分类10分钟/详情2分钟，默认）
-                          </option>
-                          <option value="round-robin">轮询节点</option>
-                          <option value="random">随机节点</option>
-                          <option value="lowest-latency">优先最低延迟</option>
-                        </select>
-                        <p className="text-[10px] text-muted-foreground">
-                          默认策略会让分类/翻页固定使用一个节点 10
-                          分钟，商品详情子任务固定使用一个节点 2
-                          分钟；二者独立轮换，遇到对应请求类型的明确风控或冷却时才单独切换。
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          Controller 端口
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={crawling.mihomoControllerPort}
-                          onChange={(e) =>
-                            updateCrawlingDraft({ mihomoControllerPort: Number(e.target.value) })
-                          }
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          节点监听起始端口
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={crawling.mihomoMixedPortStart}
-                          onChange={(e) =>
-                            updateCrawlingDraft({ mihomoMixedPortStart: Number(e.target.value) })
-                          }
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          最大载入节点数
-                        </label>
-                        <input
-                          type="number"
-                          min={-1}
-                          value={crawling.mihomoMaxNodeCount}
-                          onChange={(e) =>
-                            updateCrawlingDraft({ mihomoMaxNodeCount: Number(e.target.value) })
-                          }
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                          填写 -1 表示载入订阅中的全部节点；填写正整数则只载入前 N 个节点。
-                        </p>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-semibold text-muted-foreground">
-                          测速 URL
-                        </label>
-                        <input
-                          type="text"
-                          value={crawling.mihomoHealthCheckUrl}
-                          onChange={(e) =>
-                            updateCrawlingDraft({ mihomoHealthCheckUrl: e.target.value })
-                          }
-                          className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={() => void handleRefreshMihomoSubscription()}
-                        disabled={isRefreshingMihomo}
-                        className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                        onClick={() => void handleDownloadMihomoCore()}
+                        disabled={
+                          isDownloadingMihomoCore ||
+                          Boolean(mihomoCoreInfo && !mihomoCoreInfo.supported)
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        <RefreshCw
-                          className={`w-3.5 h-3.5 ${isRefreshingMihomo ? 'animate-spin' : ''}`}
+                        <Download
+                          className={`h-3.5 w-3.5 ${isDownloadingMihomoCore ? 'animate-pulse' : ''}`}
                         />
-                        <span>{isRefreshingMihomo ? '正在刷新订阅...' : '保存并刷新订阅'}</span>
-                      </button>
-                      <span className="text-[11px] text-muted-foreground">
-                        {mihomoStatusText || '保存配置后，Mihomo 节点池状态会显示在这里。'}
-                      </span>
-                      {mihomoActionError && (
-                        <span className="text-[11px] font-semibold text-red-500">
-                          {mihomoActionError}
+                        <span>
+                          {isDownloadingMihomoCore
+                            ? '正在下载...'
+                            : mihomoCoreInfo?.installed
+                              ? '重新下载核心插件'
+                              : '下载核心插件'}
                         </span>
-                      )}
+                      </button>
                     </div>
 
-                    <div className="border border-border/70 rounded-lg overflow-hidden bg-background/70">
-                      <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-muted-foreground bg-slate-100/70 dark:bg-zinc-900/60">
-                        <span className="col-span-4">节点</span>
-                        <span className="col-span-2">类型</span>
-                        <span className="col-span-2">端口</span>
-                        <span className="col-span-2">延迟</span>
-                        <span className="col-span-2 text-right">操作</span>
-                      </div>
-                      <div className="max-h-52 overflow-y-auto divide-y divide-border/60">
-                        {mihomoNodes.length === 0 ? (
-                          <div className="px-3 py-5 text-center text-xs text-muted-foreground">
-                            暂无节点。请填写订阅链接并点击“保存并刷新订阅”。
-                          </div>
-                        ) : (
-                          mihomoNodes.map((node) => (
-                            <div
-                              key={node.id}
-                              className="grid grid-cols-12 gap-2 px-3 py-2 text-xs items-center"
-                            >
-                              <span className="col-span-4 truncate" title={node.name}>
-                                {node.name}
-                              </span>
-                              <span className="col-span-2 uppercase text-muted-foreground">
-                                {node.type}
-                              </span>
-                              <span className="col-span-2 font-mono">{node.localPort}</span>
-                              <span
-                                className={`col-span-2 font-mono ${
-                                  node.alive ? 'text-emerald-600' : 'text-rose-500'
-                                }`}
-                                title={node.lastError || ''}
-                              >
-                                {node.latency == null
-                                  ? node.alive
-                                    ? '未测'
-                                    : '失败'
-                                  : `${node.latency}ms`}
-                              </span>
-                              <div className="col-span-2 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => void handleTestMihomoNode(node.id)}
-                                  disabled={testingNodeId === node.id}
-                                  className="px-2 py-1 rounded-md border border-border text-[11px] font-semibold hover:bg-slate-100 dark:hover:bg-zinc-900 disabled:opacity-60"
-                                >
-                                  {testingNodeId === node.id ? '测速中' : '测速'}
-                                </button>
+                    {mihomoCoreError && (
+                      <p className="text-[10px] font-semibold text-red-500">{mihomoCoreError}</p>
+                    )}
+
+                    <ToggleSwitch
+                      checked={crawling.mihomoEnabled}
+                      onChange={updateMihomoDemoEnabled}
+                      label="启用代理池"
+                      description="开启后仅软件内部请求会通过代理池转发，不修改系统代理，也不会影响其它软件。"
+                    />
+                  </div>
+                </div>
+
+                {/* Mihomo Proxy Pool */}
+                {SHOW_MIHOMO_ADVANCED_PANEL && (
+                  <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                        <Network className="w-3.5 h-3.5 text-primary" />
+                        <span>Mihomo 订阅节点池</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => void refreshMihomoState()}
+                        className="px-2.5 py-1.5 rounded-md border border-border text-[11px] font-semibold hover:bg-slate-100 dark:hover:bg-zinc-900 transition-colors flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>刷新状态</span>
+                      </button>
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-zinc-900/20 border border-border/80 rounded-xl p-4 space-y-4">
+                      <ToggleSwitch
+                        checked={crawling.mihomoEnabled}
+                        onChange={(mihomoEnabled) => updateCrawlingDraft({ mihomoEnabled })}
+                        label="启用 Mihomo 节点池代理"
+                        description="开启后仅软件内部亚马逊爬虫请求会通过本机 Mihomo 节点池转发，不修改系统代理，也不会影响其它软件。"
+                      />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                            <Globe2 className="w-3 h-3" />
+                            <span>Clash / Mihomo 订阅链接</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={crawling.mihomoSubscriptionUrl}
+                            onChange={(e) =>
+                              updateCrawlingDraft({ mihomoSubscriptionUrl: e.target.value })
+                            }
+                            placeholder="https://example.com/clash.yaml"
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            Mihomo Core 路径
+                          </label>
+                          <div className="rounded-lg border border-border/70 bg-muted/20 p-3 space-y-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="space-y-1">
+                                <p className="text-xs font-semibold text-foreground">
+                                  默认在线 Core：
+                                  {mihomoCoreInfo?.version || '读取中'}
+                                </p>
+                                <p className="break-all text-[10px] leading-relaxed text-muted-foreground">
+                                  {mihomoCoreInfo?.defaultBinaryPath ||
+                                    '留空路径时会使用用户数据目录中的 Mihomo Core。'}
+                                </p>
+                                {mihomoCoreInfo && !mihomoCoreInfo.supported && (
+                                  <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                                    当前平台 {mihomoCoreInfo.platformArch}{' '}
+                                    暂不支持自动下载，请手动填写 Core 路径。
+                                  </p>
+                                )}
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => void handleDownloadMihomoCore()}
+                                disabled={
+                                  isDownloadingMihomoCore ||
+                                  Boolean(mihomoCoreInfo && !mihomoCoreInfo.supported)
+                                }
+                                className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                <Download
+                                  className={`h-3.5 w-3.5 ${isDownloadingMihomoCore ? 'animate-pulse' : ''}`}
+                                />
+                                <span>
+                                  {isDownloadingMihomoCore
+                                    ? '正在下载...'
+                                    : mihomoCoreInfo?.installed
+                                      ? '重新下载 Core'
+                                      : '下载 Core'}
+                                </span>
+                              </button>
                             </div>
-                          ))
+                            <p className="text-[10px] text-muted-foreground">
+                              路径留空时使用上方自动下载的 Core；填写自定义路径时会优先使用自定义
+                              Core。
+                            </p>
+                            {mihomoCoreError && (
+                              <p className="text-[10px] font-semibold text-red-500">
+                                {mihomoCoreError}
+                              </p>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            value={crawling.mihomoBinaryPath}
+                            onChange={(e) =>
+                              updateCrawlingDraft({ mihomoBinaryPath: e.target.value })
+                            }
+                            placeholder="留空则使用自动下载目录；也可以填写自定义 Mihomo Core 路径"
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            节点选择策略
+                          </label>
+                          <select
+                            value={crawling.proxyNodeStrategy}
+                            onChange={(e) =>
+                              updateCrawlingDraft({
+                                proxyNodeStrategy: e.target
+                                  .value as CrawlingSettings['proxyNodeStrategy']
+                              })
+                            }
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+                          >
+                            <option value="sticky-10-minutes">
+                              定时粘性轮换（分类10分钟/详情2分钟，默认）
+                            </option>
+                            <option value="round-robin">轮询节点</option>
+                            <option value="random">随机节点</option>
+                            <option value="lowest-latency">优先最低延迟</option>
+                          </select>
+                          <p className="text-[10px] text-muted-foreground">
+                            默认策略会让分类/翻页固定使用一个节点 10
+                            分钟，商品详情子任务固定使用一个节点 2
+                            分钟；二者独立轮换，遇到对应请求类型的明确风控或冷却时才单独切换。
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            Controller 端口
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={crawling.mihomoControllerPort}
+                            onChange={(e) =>
+                              updateCrawlingDraft({ mihomoControllerPort: Number(e.target.value) })
+                            }
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            节点监听起始端口
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={crawling.mihomoMixedPortStart}
+                            onChange={(e) =>
+                              updateCrawlingDraft({ mihomoMixedPortStart: Number(e.target.value) })
+                            }
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            最大载入节点数
+                          </label>
+                          <input
+                            type="number"
+                            min={-1}
+                            value={crawling.mihomoMaxNodeCount}
+                            onChange={(e) =>
+                              updateCrawlingDraft({ mihomoMaxNodeCount: Number(e.target.value) })
+                            }
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            填写 -1 表示载入订阅中的全部节点；填写正整数则只载入前 N 个节点。
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-muted-foreground">
+                            测速 URL
+                          </label>
+                          <input
+                            type="text"
+                            value={crawling.mihomoHealthCheckUrl}
+                            onChange={(e) =>
+                              updateCrawlingDraft({ mihomoHealthCheckUrl: e.target.value })
+                            }
+                            className="w-full bg-background border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleRefreshMihomoSubscription()}
+                          disabled={isRefreshingMihomo}
+                          className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-60 transition-colors flex items-center gap-1.5"
+                        >
+                          <RefreshCw
+                            className={`w-3.5 h-3.5 ${isRefreshingMihomo ? 'animate-spin' : ''}`}
+                          />
+                          <span>{isRefreshingMihomo ? '正在刷新订阅...' : '保存并刷新订阅'}</span>
+                        </button>
+                        <span className="text-[11px] text-muted-foreground">
+                          {mihomoStatusText || '保存配置后，Mihomo 节点池状态会显示在这里。'}
+                        </span>
+                        {mihomoActionError && (
+                          <span className="text-[11px] font-semibold text-red-500">
+                            {mihomoActionError}
+                          </span>
                         )}
+                      </div>
+
+                      <div className="border border-border/70 rounded-lg overflow-hidden bg-background/70">
+                        <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[11px] font-bold text-muted-foreground bg-slate-100/70 dark:bg-zinc-900/60">
+                          <span className="col-span-4">节点</span>
+                          <span className="col-span-2">类型</span>
+                          <span className="col-span-2">端口</span>
+                          <span className="col-span-2">延迟</span>
+                          <span className="col-span-2 text-right">操作</span>
+                        </div>
+                        <div className="max-h-52 overflow-y-auto divide-y divide-border/60">
+                          {mihomoNodes.length === 0 ? (
+                            <div className="px-3 py-5 text-center text-xs text-muted-foreground">
+                              暂无节点。请填写订阅链接并点击“保存并刷新订阅”。
+                            </div>
+                          ) : (
+                            mihomoNodes.map((node) => (
+                              <div
+                                key={node.id}
+                                className="grid grid-cols-12 gap-2 px-3 py-2 text-xs items-center"
+                              >
+                                <span className="col-span-4 truncate" title={node.name}>
+                                  {node.name}
+                                </span>
+                                <span className="col-span-2 uppercase text-muted-foreground">
+                                  {node.type}
+                                </span>
+                                <span className="col-span-2 font-mono">{node.localPort}</span>
+                                <span
+                                  className={`col-span-2 font-mono ${
+                                    node.alive ? 'text-emerald-600' : 'text-rose-500'
+                                  }`}
+                                  title={node.lastError || ''}
+                                >
+                                  {node.latency == null
+                                    ? node.alive
+                                      ? '未测'
+                                      : '失败'
+                                    : `${node.latency}ms`}
+                                </span>
+                                <div className="col-span-2 text-right">
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleTestMihomoNode(node.id)}
+                                    disabled={testingNodeId === node.id}
+                                    className="px-2 py-1 rounded-md border border-border text-[11px] font-semibold hover:bg-slate-100 dark:hover:bg-zinc-900 disabled:opacity-60"
+                                  >
+                                    {testingNodeId === node.id ? '测速中' : '测速'}
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
 

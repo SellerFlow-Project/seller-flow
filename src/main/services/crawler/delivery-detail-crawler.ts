@@ -16,7 +16,6 @@ import type {
   PendingDeliveryDetailProduct,
   ProductDeliveryDetailUpdate
 } from '../../types/database'
-import type { CrawlingSettings } from '../../../shared/settings'
 import { getErrorMessage, isAbortError, throwIfAborted } from '../../utils/error'
 import { sleep } from '../../utils/time'
 import { databaseService } from '../database.service'
@@ -56,7 +55,6 @@ function createInitialState(concurrency: number): DeliveryDetailState {
 
 export class AmazonDeliveryDetailCrawler {
   private state = createInitialState(1)
-  private readonly concurrencyChangeHandlers = new Set<() => void>()
   private activeRecoveryCount = 0
 
   public constructor(private readonly onStateChange: StateChangeHandler) {}
@@ -74,20 +72,8 @@ export class AmazonDeliveryDetailCrawler {
     this.notifyStateChange()
   }
 
-  public syncRuntimeSettings(settings: CrawlingSettings): boolean {
-    const concurrency = Math.max(1, Math.floor(settings.concurrencyCount))
-    if (this.state.concurrency === concurrency) return false
-
-    this.state.concurrency = concurrency
-    return true
-  }
-
-  public applyRuntimeSettings(settings: CrawlingSettings): void {
-    if (!this.syncRuntimeSettings(settings)) return
-
-    for (const handleConcurrencyChange of this.concurrencyChangeHandlers) {
-      handleConcurrencyChange()
-    }
+  public configureConcurrency(concurrency: number): void {
+    this.state.concurrency = Math.max(1, Math.floor(concurrency))
     this.notifyStateChange()
   }
 
@@ -290,20 +276,14 @@ export class AmazonDeliveryDetailCrawler {
       let firstError: unknown
       let hasError = false
 
-      const finish = (): void => {
-        this.concurrencyChangeHandlers.delete(schedule)
-      }
-
       const settleIfComplete = (): void => {
         if (activeCount > 0) return
 
         if (hasError) {
           settled = true
-          finish()
           reject(firstError)
         } else if (nextIndex >= items.length) {
           settled = true
-          finish()
           resolve(results)
         }
       }
@@ -335,7 +315,6 @@ export class AmazonDeliveryDetailCrawler {
         settleIfComplete()
       }
 
-      this.concurrencyChangeHandlers.add(schedule)
       schedule()
     })
   }

@@ -19,6 +19,7 @@ export interface CrawlTaskConfig {
   marketplace: AmazonMarketplace
   maxPages?: number
   crawlStrategy?: CrawlStrategy
+  deliveryConcurrency?: number
   selectedCategories?: AmazonCategory[]
 }
 

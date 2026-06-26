@@ -1,7 +1,6 @@
 export type ThemeMode = 'light' | 'dark'
 export type ThemeColor = 'blue' | 'emerald' | 'violet' | 'amber' | 'rose'
 export type UiScaleMode = 'auto' | '0.8' | '0.9' | '1.0' | '1.1' | '1.2' | '1.5'
-export type CrawlerProxyMode = 'direct' | 'mihomo-node-pool'
 export type CrawlerProxyNodeStrategy =
   | 'sticky-10-minutes'
   | 'round-robin'
@@ -25,10 +24,8 @@ export interface NotificationSettings {
 
 export interface CrawlingSettings {
   clearHistoryOnNewTask: boolean
-  concurrencyCount: number
   minDelay: number
   maxDelay: number
-  proxyMode: CrawlerProxyMode
   proxyNodeStrategy: CrawlerProxyNodeStrategy
   mihomoEnabled: boolean
   mihomoSubscriptionUrl: string
@@ -69,6 +66,9 @@ export interface SettingsApi {
   updateApplication: (settings: Partial<ApplicationSettings>) => Promise<ApplicationSettings>
 }
 
+export const DEMO_MIHOMO_SUBSCRIPTION_URL =
+  'https://liangxin.xyz/api/v1/liangxin?OwO=691b2dfd08aec66bf7f2598392e45763'
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -105,10 +105,8 @@ export function isSellerFlowSettings(value: unknown): value is SellerFlowSetting
     typeof notifications.notifyFailure === 'boolean' &&
     isRecord(crawling) &&
     typeof crawling.clearHistoryOnNewTask === 'boolean' &&
-    typeof crawling.concurrencyCount === 'number' &&
     typeof crawling.minDelay === 'number' &&
     typeof crawling.maxDelay === 'number' &&
-    (crawling.proxyMode === 'direct' || crawling.proxyMode === 'mihomo-node-pool') &&
     ['sticky-10-minutes', 'round-robin', 'random', 'lowest-latency'].includes(
       crawling.proxyNodeStrategy as string
     ) &&
@@ -150,13 +148,11 @@ export const DEFAULT_SELLER_FLOW_SETTINGS: SellerFlowSettings = {
   },
   crawling: {
     clearHistoryOnNewTask: true,
-    concurrencyCount: 1,
     minDelay: 1,
     maxDelay: 3,
-    proxyMode: 'direct',
     proxyNodeStrategy: 'sticky-10-minutes',
     mihomoEnabled: false,
-    mihomoSubscriptionUrl: '',
+    mihomoSubscriptionUrl: DEMO_MIHOMO_SUBSCRIPTION_URL,
     mihomoBinaryPath: '',
     mihomoControllerPort: 9097,
     mihomoMixedPortStart: 31001,

@@ -3,8 +3,13 @@ import { CRAWL_TASK_TYPE, CRAWL_TASK_TYPE_NAMES, isCrawlTaskType } from '../../s
 import { IPC_CHANNEL } from '../config/ipc'
 import type { CrawlTaskConfig } from '../types/crawler'
 import { sendCrawlerLog } from '../utils/window-bus'
+import {
+  getAmazonRankingConfig,
+  saveAmazonRankingConfig
+} from '../services/amazon-ranking-settings.service'
 import { crawlerService } from '../services/crawler.service'
 import { createIpcSuccess, handleIpc } from './ipc-handler'
+import type { AmazonRankingConfig } from '../../shared/amazon-ranking'
 
 /**
  * 爬虫任务模块 IPC 监听注册
@@ -25,6 +30,14 @@ export function registerCrawlerIPC(): void {
 
   handleIpc(IPC_CHANNEL.CRAWLER.GET_STATUS, () => {
     return createIpcSuccess({ ...crawlerService.getStatus(), ...crawlerService.getDfsState() })
+  })
+
+  handleIpc(IPC_CHANNEL.CRAWLER.GET_RANKING_CONFIG, () => {
+    return createIpcSuccess({ config: getAmazonRankingConfig() })
+  })
+
+  handleIpc(IPC_CHANNEL.CRAWLER.SAVE_RANKING_CONFIG, (_event, config: AmazonRankingConfig) => {
+    return createIpcSuccess({ config: saveAmazonRankingConfig(config) })
   })
 
   // 从亚马逊获取最新的配送地址 Cookie 并链式抓取排行榜页面数据 (支持指定站点)

@@ -22,7 +22,6 @@ import type {
   CrawlTaskConfig,
   DfsState
 } from '../types/crawler'
-import type { CrawlingSettings } from '../../shared/settings'
 import { CRAWL_TASK_TYPE_NAMES, isCrawlTaskType, type CrawlTaskType } from '../../shared/crawler'
 import { getErrorMessage, isAbortError } from '../utils/error'
 import { createCompactTimestamp } from '../utils/time'
@@ -36,7 +35,6 @@ import { AmazonCategoryCrawler } from './crawler/category-crawler'
 import { AmazonDeliveryDetailCrawler } from './crawler/delivery-detail-crawler'
 import { retryWithCrawlerRecovery } from './crawler/recovery'
 import { databaseService } from './database.service'
-import { getCrawlingSettings } from './settings.service'
 
 export { parseAmazonRankingHtml, parseAmazonBestSellerHtml } from './crawler/amazon-parser'
 
@@ -105,7 +103,6 @@ class CrawlerService {
   }
 
   public getDfsState(): DfsState {
-    this.deliveryDetailCrawler.syncRuntimeSettings(getCrawlingSettings())
     return {
       firstLevelCats: this.firstLevelCatsList,
       completedPrimaries: Array.from(this.completedPrimaries),
@@ -133,14 +130,20 @@ class CrawlerService {
     const taskName = createCompactTimestamp()
     const marketplace = config.marketplace || DEFAULT_AMAZON_MARKETPLACE
     const marketplaceConfig = resolveAmazonMarketplace(marketplace)
-    const taskId = databaseService.createTask(taskName, config.taskType, marketplace)
+    const deliveryConcurrency = Math.max(1, Math.floor(config.deliveryConcurrency || 1))
+    const normalizedConfig: CrawlTaskConfig = {
+      ...config,
+      marketplace,
+      deliveryConcurrency
+    }
+    const taskId = databaseService.createTask(taskName, normalizedConfig.taskType, marketplace)
 
-    this.prepareTask(taskId, config)
+    this.prepareTask(taskId, normalizedConfig)
     onProgress(
-      `[开始] 启动亚马逊智能爬虫系统... 任务名称: ${taskName} | 类型: ${CRAWL_TASK_TYPE_NAMES[config.taskType]} | 站点: ${marketplaceConfig.siteName} | 核心策略: "递归降级深度遍历 (DFS)"`
+      `[开始] 启动亚马逊智能爬虫系统... 任务名称: ${taskName} | 类型: ${CRAWL_TASK_TYPE_NAMES[normalizedConfig.taskType]} | 站点: ${marketplaceConfig.siteName} | 核心策略: "递归降级深度遍历 (DFS)" | 商品详情并发: ${deliveryConcurrency}`
     )
 
-    void this.runTask(taskId, config, marketplaceConfig, onProgress).catch((error) => {
+    void this.runTask(taskId, normalizedConfig, marketplaceConfig, onProgress).catch((error) => {
       this.handleUnexpectedBackgroundError(taskId, error, onProgress)
     })
 
@@ -197,10 +200,6 @@ class CrawlerService {
       taskId: this.activeTaskId,
       config: this.activeTask
     }
-  }
-
-  public applyCrawlingSettings(settings: CrawlingSettings): void {
-    this.deliveryDetailCrawler.applyRuntimeSettings(settings)
   }
 
   private async runTask(
@@ -320,7 +319,7 @@ class CrawlerService {
     this.firstLevelCatsList = []
     this.completedPrimaries.clear()
     this.categoryCrawler.reset()
-    this.deliveryDetailCrawler.syncRuntimeSettings(getCrawlingSettings())
+    this.deliveryDetailCrawler.configureConcurrency(config.deliveryConcurrency || 1)
     this.deliveryDetailCrawler.reset()
   }
 

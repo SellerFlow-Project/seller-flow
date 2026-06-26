@@ -39,6 +39,10 @@ function getNodeScopeFailureCount(node: MihomoProxyNode, scope: 'category' | 'de
     : node.detailNetworkFailCount || 0
 }
 
+function formatProxyNodeDisplayName(index: number): string {
+  return `代理节点${index + 1}`
+}
+
 export const AppHeader: React.FC<AppHeaderProps> = ({ breadcrumbs }) => {
   const [mihomoStatus, setMihomoStatus] = useState<MihomoRuntimeStatus | null>(null)
   const [mihomoNodes, setMihomoNodes] = useState<MihomoProxyNode[]>([])
@@ -72,17 +76,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ breadcrumbs }) => {
   const coolingNodeCount = mihomoNodes.filter(
     (node) => node.categoryCooldownUntil || node.detailCooldownUntil || node.cooldownUntil
   ).length
+  const getProxyNodeDisplayName = (node: MihomoProxyNode): string => {
+    const index = mihomoNodes.findIndex((item) => item.id === node.id)
+    return formatProxyNodeDisplayName(index >= 0 ? index : 0)
+  }
   const cardTitle = !mihomoStatus?.enabled
     ? '代理池未启用'
     : currentNodes.length > 0
       ? currentNodes
           .flatMap((node) =>
-            (node.currentScopes || []).map((scope) => `${getScopeLabel(scope)}：${node.name}`)
+            (node.currentScopes || []).map(
+              (scope) => `${getScopeLabel(scope)}：${getProxyNodeDisplayName(node)}`
+            )
           )
           .join(' / ')
       : mihomoStatus.running
-        ? `节点池运行中，可用 ${healthyNodeCount}/${mihomoStatus.nodeCount}`
-        : '节点池未运行'
+        ? `代理池运行中，可用 ${healthyNodeCount}/${mihomoStatus.nodeCount}`
+        : '代理池未运行'
 
   return (
     <header className="h-14 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-slate-800 rounded-2xl flex items-center justify-between px-6 flex-shrink-0 shadow-sm mt-4 mr-4 ml-4">
@@ -148,7 +158,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ breadcrumbs }) => {
                 <div className="flex items-center gap-2">
                   <Router className="h-4 w-4 text-primary" />
                   <div>
-                    <h3 className="text-xs font-bold text-foreground">Mihomo 节点池状态</h3>
+                    <h3 className="text-xs font-bold text-foreground">代理池状态</h3>
                     <p className="text-[10px] text-muted-foreground">
                       {mihomoStatus?.running
                         ? `运行中，节点 ${mihomoStatus.nodeCount} 个`
@@ -170,11 +180,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ breadcrumbs }) => {
               <div className="max-h-[420px] overflow-y-auto p-3">
                 {mihomoNodes.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-                    暂无节点数据。请在设置页启用 Mihomo 节点池并刷新订阅。
+                    暂无节点数据。请在设置页启用代理池。
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {mihomoNodes.map((node) => {
+                    {mihomoNodes.map((node, index) => {
                       const isCurrent = Boolean(node.currentScopes?.length)
                       return (
                         <div
@@ -189,7 +199,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ breadcrumbs }) => {
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="truncate font-bold text-foreground">
-                                  {node.name}
+                                  {formatProxyNodeDisplayName(index)}
                                 </span>
                                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-500 dark:bg-zinc-900">
                                   {node.type}

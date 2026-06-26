@@ -23,6 +23,11 @@ import {
   AmazonMarketplace,
   MarketplaceConfigs
 } from '../types/crawler'
+import {
+  DEFAULT_AMAZON_RANKING_CONFIG,
+  normalizeAmazonRankingConfig,
+  type AmazonRankingConfig
+} from '../../../shared/amazon-ranking'
 
 const DELIVERY_DETAIL_BATCH_SIZE = 100
 
@@ -87,6 +92,11 @@ interface AmazonCategoryPreference extends AdjustableAmazonCategory {
 type AmazonCategoryPreferenceStore = Record<string, AmazonCategoryPreference[]>
 
 const AMAZON_CATEGORY_PREFERENCE_STORAGE_KEY = 'sellerflow.amazon.category-preferences.v1'
+
+function parseNumberInput(value: string, fallback: number, min = 0): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? Math.max(min, Math.floor(parsed)) : fallback
+}
 
 function buildCategoryPreferenceKey(
   taskType: CrawlTaskType,
@@ -220,6 +230,9 @@ export const AmazonCollection: React.FC = () => {
   const [taskType, setTaskType] = useState<CrawlTaskType>(CrawlTaskType.BEST_SELLERS)
   const [marketplace, setMarketplace] = useState<AmazonMarketplace>(AmazonMarketplace.JP)
   const [crawlStrategy, setCrawlStrategy] = useState<'strategy1' | 'strategy2'>('strategy1')
+  const [deliveryConcurrency, setDeliveryConcurrency] = useState(
+    String(DEFAULT_AMAZON_RANKING_CONFIG.deliveryConcurrency)
+  )
   const [isCrawling, setIsCrawling] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [logs, setLogs] = useState<string[]>(['系统就绪，等待用户启动采集任务。'])
@@ -241,6 +254,9 @@ export const AmazonCollection: React.FC = () => {
   const [showAdjustModal, setShowAdjustModal] = useState(false)
   const [preparedTaskType, setPreparedTaskType] = useState<CrawlTaskType | null>(null)
   const [preparedMarketplace, setPreparedMarketplace] = useState<AmazonMarketplace | null>(null)
+  const [preparedDeliveryConcurrency, setPreparedDeliveryConcurrency] = useState<number | null>(
+    null
+  )
   const [tempCategories, setTempCategories] = useState<AdjustableAmazonCategory[]>([])
   const [originalCategories, setOriginalCategories] = useState<AdjustableAmazonCategory[]>([])
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
@@ -250,6 +266,22 @@ export const AmazonCollection: React.FC = () => {
   )
 
   const logsContainerRef = useRef<HTMLDivElement>(null)
+
+  const applyRankingConfig = (config: AmazonRankingConfig) => {
+    const normalizedConfig = normalizeAmazonRankingConfig(config)
+    setDeliveryConcurrency(String(normalizedConfig.deliveryConcurrency))
+    return normalizedConfig
+  }
+
+  const buildRankingConfig = (): AmazonRankingConfig => {
+    return {
+      deliveryConcurrency: parseNumberInput(
+        deliveryConcurrency,
+        DEFAULT_AMAZON_RANKING_CONFIG.deliveryConcurrency,
+        1
+      )
+    }
+  }
 
   // Scroll to bottom of logs (restricted to the logs container only, preventing whole page scrolling)
   useEffect(() => {
@@ -324,6 +356,9 @@ export const AmazonCollection: React.FC = () => {
             if (status.config.crawlStrategy) {
               setCrawlStrategy(status.config.crawlStrategy as 'strategy1' | 'strategy2')
             }
+            if (status.config.deliveryConcurrency) {
+              setDeliveryConcurrency(String(status.config.deliveryConcurrency))
+            }
             setLogs((prev) => {
               const message = status.isStopping
                 ? '[系统] 检测到后台任务正在停止，状态已无缝续接。'
@@ -344,6 +379,17 @@ export const AmazonCollection: React.FC = () => {
     }
     checkActiveCrawler()
 
+    void window.electron.ipcRenderer
+      .invoke('crawler:get-ranking-config')
+      .then((response) => {
+        if (response?.success && response.config && !isCrawling) {
+          applyRankingConfig(response.config)
+        }
+      })
+      .catch((error) => {
+        setLogs((prev) => [...prev, `[错误] 读取排行榜本地配置失败: ${String(error)}`])
+      })
+
     return () => {
       // 卸载时注销管道，防止重复绑定内存泄漏
       window.electron.ipcRenderer.removeAllListeners('crawler:log-progress')
@@ -357,16 +403,28 @@ export const AmazonCollection: React.FC = () => {
   const startCrawl = async () => {
     const requestedTaskType = taskType
     const requestedMarketplace = marketplace
+    const rankingConfig = buildRankingConfig()
     setIsFetchingCats(true)
     setPreparedTaskType(null)
     setPreparedMarketplace(null)
+    setPreparedDeliveryConcurrency(null)
     setLogs((prev) => [
       ...prev,
-      `[系统] 正在准备开启 ${MarketplaceConfigs[requestedMarketplace].name} ${CrawlTaskTypeNames[requestedTaskType]}...`
+      `[系统] 正在准备开启 ${MarketplaceConfigs[requestedMarketplace].name} ${CrawlTaskTypeNames[requestedTaskType]}...`,
+      `[参数] 商品详情采集并发数: ${rankingConfig.deliveryConcurrency}`
     ])
     setLogs((prev) => [...prev, '[系统] 正在动态获取 Cookie 凭证并尝试抓取排行榜顶级分类数据...'])
 
     try {
+      const savedConfigResponse = await window.electron.ipcRenderer.invoke(
+        'crawler:save-ranking-config',
+        rankingConfig
+      )
+      if (!savedConfigResponse?.success || !savedConfigResponse.config) {
+        throw new Error(savedConfigResponse?.error || '保存排行榜采集配置失败')
+      }
+      const savedConfig = applyRankingConfig(savedConfigResponse.config)
+
       const res = await window.electron.ipcRenderer.invoke('crawler:get-amazon-cookies', {
         marketplace: requestedMarketplace,
         taskType: requestedTaskType
@@ -392,6 +450,7 @@ export const AmazonCollection: React.FC = () => {
       setTempCategories(mergedCats)
       setPreparedTaskType(requestedTaskType)
       setPreparedMarketplace(requestedMarketplace)
+      setPreparedDeliveryConcurrency(savedConfig.deliveryConcurrency)
       saveCategoryPreferences(requestedTaskType, requestedMarketplace, mergedCats)
       setShowAdjustModal(true)
       setLogs((prev) => [
@@ -430,6 +489,8 @@ export const AmazonCollection: React.FC = () => {
       alert('排行榜任务尚未准备完成，请重新获取分类。')
       return
     }
+    const deliveryConcurrencyValue =
+      preparedDeliveryConcurrency || buildRankingConfig().deliveryConcurrency
 
     const selectedCategories = tempCategories
       .filter((c) => c.enabled)
@@ -465,6 +526,7 @@ export const AmazonCollection: React.FC = () => {
         taskType: preparedTaskType,
         marketplace: preparedMarketplace,
         crawlStrategy,
+        deliveryConcurrency: deliveryConcurrencyValue,
         selectedCategories // 传递过滤并排序后的首级分类列表
       })
 
@@ -496,6 +558,7 @@ export const AmazonCollection: React.FC = () => {
     setShowAdjustModal(false)
     setPreparedTaskType(null)
     setPreparedMarketplace(null)
+    setPreparedDeliveryConcurrency(null)
     setLogs((prev) => [...prev, '[系统] 用户取消了分类调整，采集任务已终止。'])
   }
 
@@ -701,7 +764,7 @@ export const AmazonCollection: React.FC = () => {
         {isConfigExpanded && (
           <div className="p-5 space-y-4 rounded-b-lg">
             {/* Row of Controls & Launch Button */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
               {/* 采集任务类型 */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-muted-foreground uppercase">
@@ -754,6 +817,21 @@ export const AmazonCollection: React.FC = () => {
                   <option value="strategy1">实时并轨采集</option>
                   <option value="strategy2">延迟批量回填</option>
                 </select>
+              </div>
+
+              {/* 商品详情并发数 */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">
+                  详情并发数
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={deliveryConcurrency}
+                  onChange={(e) => setDeliveryConcurrency(e.target.value)}
+                  disabled={isCrawling || isFetchingCats || showAdjustModal}
+                  className="w-full bg-background border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all-200 font-mono disabled:cursor-not-allowed disabled:opacity-60"
+                />
               </div>
 
               {/* 操作控制按钮 */}

@@ -31,7 +31,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       ? '管理员'
       : currentUser?.roles.includes('staff')
         ? '运营人员'
-        : '普通用户'
+        : '试用账号'
 
   return (
     <aside className="w-64 my-4 ml-4 bg-white dark:bg-zinc-950 border border-slate-200 dark:border-slate-800/80 rounded-2xl flex flex-col justify-between flex-shrink-0 shadow-sm">

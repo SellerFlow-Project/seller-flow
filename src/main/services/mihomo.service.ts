@@ -662,7 +662,7 @@ class MihomoService {
     this.settings = settings
     this.controllerUrl = `http://${MIHOMO_CONTROLLER_HOST}:${settings.mihomoControllerPort}`
 
-    if (!settings.mihomoEnabled || settings.proxyMode !== 'mihomo-node-pool') {
+    if (!settings.mihomoEnabled) {
       await this.stop()
       return this.getStatus()
     }
@@ -678,9 +678,9 @@ class MihomoService {
   public getStatus(): MihomoRuntimeStatus {
     const settings = this.settings || getCrawlingSettings()
     return {
-      enabled: settings.mihomoEnabled && settings.proxyMode === 'mihomo-node-pool',
+      enabled: settings.mihomoEnabled,
       running: Boolean(this.process && !this.process.killed),
-      mode: settings.proxyMode === 'mihomo-node-pool' ? 'node-pool' : 'disabled',
+      mode: settings.mihomoEnabled ? 'node-pool' : 'disabled',
       controllerUrl:
         this.controllerUrl || `http://${MIHOMO_CONTROLLER_HOST}:${settings.mihomoControllerPort}`,
       nodeCount: this.nodes.length,
@@ -851,7 +851,7 @@ class MihomoService {
     signal?: AbortSignal
   ): Promise<Dispatcher | undefined> {
     const settings = this.getSettings()
-    if (!settings.mihomoEnabled || settings.proxyMode !== 'mihomo-node-pool') return undefined
+    if (!settings.mihomoEnabled) return undefined
     if (this.nodes.length === 0) {
       throw new Error('Mihomo 节点池未就绪，暂无可用节点。')
     }

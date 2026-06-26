@@ -4,6 +4,8 @@ export const IPC_CHANNEL = {
     START_TASK: 'crawler:start-task',
     STOP_TASK: 'crawler:stop-task',
     GET_STATUS: 'crawler:get-status',
+    GET_RANKING_CONFIG: 'crawler:get-ranking-config',
+    SAVE_RANKING_CONFIG: 'crawler:save-ranking-config',
     GET_AMAZON_COOKIES: 'crawler:get-amazon-cookies'
   },
   AMAZON_SEARCH: {
