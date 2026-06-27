@@ -98,13 +98,24 @@ export interface AccountApi {
 }
 
 export const ROLE_PERMISSIONS: Record<AccountRole, AccountPermission[]> = {
-  user: ['dashboard:view', 'crawler:amazon', 'data:browse', 'ai:use', 'account:self'],
+  user: [
+    'dashboard:view',
+    'crawler:amazon',
+    'data:browse',
+    'data:delete',
+    'ai:use',
+    'sellersprite:manage',
+    'settings:manage',
+    'account:self'
+  ],
   staff: [
     'dashboard:view',
     'crawler:amazon',
     'data:browse',
+    'data:delete',
     'ai:use',
     'sellersprite:manage',
+    'settings:manage',
     'account:self'
   ],
   admin: [

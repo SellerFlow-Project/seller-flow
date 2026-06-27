@@ -4,6 +4,10 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-06-27
+
+- 修复账号权限问题
+
 ## [0.3.0] - 2026-06-27
 
 - 将账号权限角色的“普通用户”修改为“试用账号”
