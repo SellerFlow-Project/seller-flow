@@ -12,8 +12,10 @@ import type { CrawlingSettings } from '../../shared/settings'
 import type { MihomoCoreInfo, MihomoProxyNode, MihomoRuntimeStatus } from '../../shared/mihomo'
 import {
   MIHOMO_CORE_VERSION,
+  getMihomoCoreDownloadUrls,
   getMihomoCoreReleaseAsset,
-  getMihomoPlatformArch
+  getMihomoPlatformArch,
+  type MihomoCoreArchiveType
 } from '../config/mihomo'
 import { getErrorMessage } from '../utils/error'
 import { sleep } from '../utils/time'
@@ -486,10 +488,24 @@ function createMihomoCoreInfo(): MihomoCoreInfo {
     version: MIHOMO_CORE_VERSION,
     platformArch,
     defaultBinaryPath,
-    downloadUrl: asset?.downloadUrl,
+    downloadUrl: asset?.mirrorDownloadUrl || asset?.downloadUrl,
     installed: existsSync(defaultBinaryPath),
     supported: Boolean(asset)
   }
+}
+
+async function downloadMihomoCoreExecutable(
+  downloadUrl: string,
+  archiveType: MihomoCoreArchiveType,
+  executableName: string
+): Promise<Buffer> {
+  const response = await fetch(downloadUrl)
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const archive = Buffer.from(await response.arrayBuffer())
+  return await extractMihomoCoreArchive(archive, archiveType, executableName)
 }
 
 function findZipEndOfCentralDirectory(buffer: Buffer): number {
@@ -723,23 +739,27 @@ class MihomoService {
       throw new Error(`当前平台暂不支持自动下载 Mihomo Core：${platformArch}`)
     }
 
-    const response = await fetch(asset.downloadUrl)
-    if (!response.ok) {
-      throw new Error(`Mihomo Core 下载失败，HTTP ${response.status}`)
+    const binaryPath = getDefaultMihomoBinaryPath()
+    const errors: string[] = []
+
+    for (const downloadUrl of getMihomoCoreDownloadUrls(asset)) {
+      try {
+        const executable = await downloadMihomoCoreExecutable(
+          downloadUrl,
+          asset.archiveType,
+          asset.executableName
+        )
+        await mkdir(dirname(binaryPath), { recursive: true })
+        await writeFile(binaryPath, executable)
+        await ensureMihomoBinaryExecutable(binaryPath)
+
+        return createMihomoCoreInfo()
+      } catch (error) {
+        errors.push(`${downloadUrl}: ${getErrorMessage(error)}`)
+      }
     }
 
-    const archive = Buffer.from(await response.arrayBuffer())
-    const executable = await extractMihomoCoreArchive(
-      archive,
-      asset.archiveType,
-      asset.executableName
-    )
-    const binaryPath = getDefaultMihomoBinaryPath()
-    await mkdir(dirname(binaryPath), { recursive: true })
-    await writeFile(binaryPath, executable)
-    await ensureMihomoBinaryExecutable(binaryPath)
-
-    return createMihomoCoreInfo()
+    throw new Error(`Mihomo Core 下载失败，所有下载源均不可用。${errors.join('；')}`)
   }
 
   public async refreshSubscription(

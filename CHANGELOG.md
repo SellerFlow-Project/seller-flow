@@ -4,6 +4,10 @@ All notable changes to SellerFlow are documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-06-27
+
+- 修复代理池内核文件下载问题
+
 ## [0.3.1] - 2026-06-27
 
 - 修复账号权限问题
